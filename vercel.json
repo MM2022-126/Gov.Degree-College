@@ -5,15 +5,7 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": { "distDir": "dist" }
-    },
-    {
-      "src": "api/**/*.ts",
-      "use": "@vercel/node"
     }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
     "VITE_API_URL": "https://your-render-backend-url.onrender.com/api"
