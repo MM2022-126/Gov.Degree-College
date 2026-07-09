@@ -11,7 +11,7 @@
     "dev": "tsx server.ts",
     "build": "tsc",
     "prestart": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist/server.js')){console.warn('dist/server.js not found — attempting to build'); process.exit(0);}\"",
-    "start": "node ./scripts/start.js",
+    "start": "node ./scripts/start.cjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext .ts"
   },
