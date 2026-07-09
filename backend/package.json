@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "tsc",
-    "prestart": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist/server.js')){console.warn('dist/server.js not found — attempting to build'); process.exit(0);}\"",
+    "postinstall": "npm run build",
+    "prestart": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist/server.js')){console.error('dist/server.js not found — build must run before start'); process.exit(1);}\"",
     "start": "node ./scripts/start.cjs",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext .ts"
