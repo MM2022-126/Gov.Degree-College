@@ -15,12 +15,12 @@ try {
     console.log('dist/server.js not found — running build...');
     // attempt to install and build
     try {
-      run('npm ci');
+      run('NODE_ENV=development npm ci');
     } catch (e) {
       console.warn('npm ci failed, running npm install');
       run('npm install');
     }
-    run('npm run build');
+    run('NODE_ENV=development npm run build');
   }
   // start the compiled server as a child process (handles ESM/CJS correctly)
   console.log('Starting server...');
