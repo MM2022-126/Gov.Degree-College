@@ -1,4 +1,5 @@
 import { Router } from "express";
+import jwt from "jsonwebtoken";
 import { Messages } from "../models/Messages.js";
 import { ChatMessage } from "../models/ChatMessage.js";
 import { verifyToken, AuthRequest } from "../middleware/auth.js";
@@ -75,6 +76,50 @@ router.get("/chat-messages", async (req, res) => {
     res.json(messages);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch chat messages" });
+  }
+});
+
+// POST create chat message (user or admin)
+router.post("/chat-messages", async (req, res) => {
+  try {
+    const { sessionId, sender, text, name, senderDisplayName, tempId } = req.body;
+
+    if (!sessionId || !sender || !text) {
+      return res.status(400).json({ error: "sessionId, sender, and text are required" });
+    }
+
+    if (!["user", "admin"].includes(sender)) {
+      return res.status(400).json({ error: "sender must be either 'user' or 'admin'" });
+    }
+
+    if (sender === "admin") {
+      const token = req.cookies?.admin_token;
+      if (!token) {
+        return res.status(401).json({ error: "Unauthorized admin message" });
+      }
+      try {
+        jwt.verify(token, process.env.JWT_SECRET as string);
+      } catch (err) {
+        return res.status(401).json({ error: "Invalid or expired admin token" });
+      }
+    }
+
+    const message = new ChatMessage({
+      sessionId,
+      sender,
+      text: text.trim(),
+      name: sender === "admin" ? "Admin" : name || "Visitor",
+      senderDisplayName: senderDisplayName || (sender === "admin" ? "Admin" : name || "Visitor"),
+      read: sender === "admin",
+      timestamp: new Date(),
+      tempId: tempId || null,
+    });
+
+    await message.save();
+    res.status(201).json(message);
+  } catch (error) {
+    console.error("Chat message creation error:", error);
+    res.status(500).json({ error: "Failed to create chat message" });
   }
 });
 

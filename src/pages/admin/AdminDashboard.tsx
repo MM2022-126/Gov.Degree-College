@@ -37,7 +37,7 @@ const AdminDashboard = () => {
     const fetchDashboardStats = async () => {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:3000/api/admin/dashboard-stats", {
+        const response = await fetch(`${import.meta.env.VITE_API_URL?.trim() || "/api"}/admin/dashboard-stats`, {
           credentials: "include",
         });
 

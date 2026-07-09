@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, BookOpen } from "lucide-react";
-import { getDepartments, getPrograms, createDepartment, updateDepartment, deleteDepartment, createProgram, updateProgram, deleteProgram } from "@/lib/api";
+import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const ICONS = ["📚", "💻", "📊", "⚙️", "🏥", "🎨", "🔬", "🌍", "⚖️", "🧮", "📐", "🧪"];
 const LEVELS = ["Intermediate", "ADP/ADS", "BS (4-Year)", "Postgraduate"];
+
+interface Program {
+  _id?: string;
+  department_id?: string;
+  name: string;
+  level: string;
+  duration: string;
+  description?: string;
+}
 
 interface Department {
   _id: string;
@@ -20,21 +29,12 @@ interface Department {
   icon: string;
   description: string;
   display_order: number;
-}
-
-interface Program {
-  _id: string;
-  department_id: string;
-  name: string;
-  level: string;
-  duration: string;
-  description?: string;
+  programs?: Program[];
 }
 
 const AdminDepartments = () => {
   const { toast } = useToast();
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [programs, setPrograms] = useState<Program[]>([]);
   const [deptDialogOpen, setDeptDialogOpen] = useState(false);
   const [progDialogOpen, setProgDialogOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -42,20 +42,23 @@ const AdminDepartments = () => {
   const [deptForm, setDeptForm] = useState({ name: "", icon: "📚", description: "", display_order: 0 });
   const [progForm, setProgForm] = useState({ department_id: "", name: "", level: "Intermediate", duration: "", description: "" });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const [depts, progs] = await Promise.all([
-        getDepartments(),
-        getPrograms(),
-      ]);
-      if (depts) setDepartments(depts);
-      if (progs) setPrograms(progs);
+      const depts = (await getDepartments()) as Department[];
+      const normalized = depts.map((dept) => ({
+        ...dept,
+        programs: dept.programs?.map((prog) => ({
+          ...prog,
+          department_id: dept._id,
+        })) ?? [],
+      }));
+      setDepartments(normalized);
     } catch (error) {
       toast({ title: "Error", description: "Failed to fetch data", variant: "destructive" });
     }
-  };
+  }, [toast]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const saveDepartment = async () => {
     if (!deptForm.name.trim()) return;
@@ -87,13 +90,61 @@ const AdminDepartments = () => {
 
   const saveProgram = async () => {
     if (!progForm.name.trim() || !progForm.department_id) return;
+
     try {
-      if (editingProg) {
-        await updateProgram(editingProg._id, progForm);
-      } else {
-        await createProgram(progForm);
+      const targetDept = departments.find((d) => d._id === progForm.department_id);
+      if (!targetDept) {
+        throw new Error("Selected department not found");
       }
-      toast({ title: editingProg ? "Program updated" : "Program added" });
+
+      const existingPrograms = targetDept.programs ?? [];
+      let updatedPrograms: Program[] = [];
+
+      if (editingProg) {
+        const updatedProgram = {
+          _id: editingProg._id,
+          department_id: progForm.department_id,
+          name: progForm.name,
+          level: progForm.level,
+          duration: progForm.duration,
+          description: progForm.description,
+        };
+
+        if (editingProg.department_id === progForm.department_id) {
+          updatedPrograms = existingPrograms.map((program) =>
+            program._id === editingProg._id ? updatedProgram : program
+          );
+          await updateDepartment(targetDept._id, { programs: updatedPrograms });
+        } else {
+          const originalDept = departments.find((d) => d._id === editingProg.department_id);
+          if (!originalDept) {
+            throw new Error("Original department not found");
+          }
+
+          const originalPrograms = originalDept.programs ?? [];
+          const updatedOriginalPrograms = originalPrograms.filter((program) => program._id !== editingProg._id);
+
+          await Promise.all([
+            updateDepartment(originalDept._id, { programs: updatedOriginalPrograms }),
+            updateDepartment(targetDept._id, { programs: [...existingPrograms, updatedProgram] }),
+          ]);
+        }
+
+        toast({ title: "Program updated" });
+      } else {
+        const newProgram: Program = {
+          department_id: progForm.department_id,
+          name: progForm.name,
+          level: progForm.level,
+          duration: progForm.duration,
+          description: progForm.description,
+        };
+
+        updatedPrograms = [...existingPrograms, newProgram];
+        await updateDepartment(targetDept._id, { programs: updatedPrograms });
+        toast({ title: "Program added" });
+      }
+
       setProgDialogOpen(false);
       setEditingProg(null);
       setProgForm({ department_id: "", name: "", level: "Intermediate", duration: "", description: "" });
@@ -105,7 +156,13 @@ const AdminDepartments = () => {
 
   const handleDeleteProgram = async (id: string) => {
     try {
-      await deleteProgram(id);
+      const department = departments.find((dept) => dept.programs?.some((prog) => prog._id === id));
+      if (!department) {
+        throw new Error("Program department not found");
+      }
+
+      const updatedPrograms = (department.programs ?? []).filter((prog) => prog._id !== id);
+      await updateDepartment(department._id, { programs: updatedPrograms });
       toast({ title: "Program deleted" });
       fetchData();
     } catch (error) {
@@ -120,8 +177,9 @@ const AdminDepartments = () => {
   };
 
   const openEditProg = (p: Program) => {
-    setEditingProg(p);
-    setProgForm({ department_id: p.department_id, name: p.name, level: p.level, duration: p.duration || "", description: p.description || "" });
+    const departmentId = p.department_id || departments.find((d) => d.programs?.some((prog) => prog._id === p._id))?._id || "";
+    setEditingProg({ ...p, department_id: departmentId });
+    setProgForm({ department_id: departmentId, name: p.name, level: p.level, duration: p.duration || "", description: p.description || "" });
     setProgDialogOpen(true);
   };
 
@@ -169,8 +227,8 @@ const AdminDepartments = () => {
                       <h3 className="font-bold text-foreground">{dept.name}</h3>
                       <p className="text-sm text-muted-foreground line-clamp-2">{dept.description}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {programs.filter(p => p.department_id === dept._id).length > 0 
-                          ? `${programs.filter(p => p.department_id === dept._id).length} programs` 
+                        {dept.programs && dept.programs.length > 0
+                          ? `${dept.programs.length} programs`
                           : "Programs coming soon"}
                       </p>
                     </div>
@@ -224,19 +282,19 @@ const AdminDepartments = () => {
             </Dialog>
           </div>
 
-          {programs.length === 0 ? (
+          {departments.every((dept) => !dept.programs || dept.programs.length === 0) ? (
             <Card><CardContent className="p-8 text-center text-muted-foreground">No programs added yet. Add departments first, then add programs.</CardContent></Card>
           ) : (
             <div className="space-y-2">
-              {departments.map(dept => {
-                const deptProgs = programs.filter(p => p.department_id === dept._id);
+              {departments.map((dept) => {
+                const deptProgs = dept.programs ?? [];
                 if (deptProgs.length === 0) return null;
                 return (
                   <Card key={dept._id}>
                     <CardHeader className="pb-2"><CardTitle className="text-lg flex items-center gap-2"><span>{dept.icon}</span>{dept.name}</CardTitle></CardHeader>
                     <CardContent className="space-y-2">
-                      {deptProgs.map(prog => (
-                        <div key={prog.id} className="flex items-center justify-between p-3 bg-accent/50 rounded-md">
+                      {deptProgs.map((prog, idx) => (
+                        <div key={prog._id ?? idx} className="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                           <div>
                             <div className="flex items-center gap-2">
                               <BookOpen className="h-4 w-4 text-primary" />
@@ -247,7 +305,7 @@ const AdminDepartments = () => {
                           </div>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openEditProg(prog)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProgram(prog._id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteProgram(prog._id ?? "")}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                           </div>
                         </div>
                       ))}

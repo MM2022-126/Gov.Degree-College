@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { Departments } from "../models/Departments.js";
-import { Programs } from "../models/Programs.js";
 import { verifyToken, AuthRequest } from "../middleware/auth.js";
 
 const router = Router();
@@ -54,8 +53,20 @@ router.get("/departments/:id", async (req, res) => {
 // GET programs for a department
 router.get("/departments/:id/programs", async (req, res) => {
   try {
-    const programs = await Programs.find({ department_id: req.params.id });
-    res.json(programs);
+    const { id } = req.params;
+    let department;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      department = await Departments.findById(id).lean();
+    }
+    if (!department) {
+      department = await Departments.findOne({ slug: id }).lean();
+    }
+
+    if (!department) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+
+    res.json(department.programs || []);
   } catch (error) {
     res.status(500).json({ error: "Failed to fetch programs" });
   }

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: scholarshine-connect-backend
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: "cd backend && npm install && npm run build"
+    startCommand: "cd backend && npm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGINS
+        value: https://your-vercel-frontend-url.vercel.app

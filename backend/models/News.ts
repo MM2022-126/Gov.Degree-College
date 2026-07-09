@@ -8,9 +8,11 @@ const newsSchema = new mongoose.Schema({
   date: { type: String, default: () => new Date().toISOString().split("T")[0] },
   slug: { type: String, sparse: true },
   imageUrl: { type: String, default: "" },
+  imageAlt: { type: String, default: "" },
   videoUrl: { type: String, default: "" },
+  video_url: { type: String, default: "" },
+  isPublished: { type: Boolean, default: true },
   images: [{ type: String }],
-  video_url: { type: String },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });

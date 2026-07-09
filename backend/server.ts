@@ -34,17 +34,59 @@ import { ChatConversation } from "./models/ChatConversation.js";
 
 const app = express();
 const server = http.createServer(app);
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+const parseAllowedOrigins = () => {
+  const configuredOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "http://localhost:5173,http://localhost:8080,http://localhost:8081")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return [...new Set([...configuredOrigins, "http://localhost:5173", "http://localhost:8080", "http://localhost:8081"])];
+};
+
+const allowedOrigins = parseAllowedOrigins();
+
+const corsOriginHandler = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin) return callback(null, true);
+  if (process.env.NODE_ENV !== "production") return callback(null, true);
+
+  try {
+    const parsedOrigin = new URL(origin);
+    const hostname = parsedOrigin.hostname;
+    const isAllowed = allowedOrigins.some((allowedOrigin) => {
+      if (allowedOrigin === "*" || allowedOrigin === origin) return true;
+
+      try {
+        const parsedAllowedOrigin = new URL(allowedOrigin);
+        return parsedAllowedOrigin.protocol === parsedOrigin.protocol && parsedAllowedOrigin.hostname === hostname;
+      } catch {
+        return false;
+      }
+    });
+
+    if (isAllowed || hostname.endsWith(".vercel.app") || hostname.endsWith(".onrender.com")) {
+      return callback(null, true);
+    }
+  } catch {
+    // Fall through to deny the origin.
+  }
+
+  return callback(new Error("Not allowed by CORS"));
+};
+
 const io = new SocketIOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: corsOriginHandler,
     methods: ["GET", "POST"],
     credentials: true,
   },
 });
 
 // Middleware
+app.set("trust proxy", 1);
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: corsOriginHandler,
   credentials: true,
 }));
 app.use(express.json());
@@ -191,19 +233,27 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+const HOST = "0.0.0.0";
 
 const startServer = async () => {
   try {
-    await connectDB();
-    server.listen(PORT, () => {
-      console.log(`✓ Server running on http://localhost:${PORT}`);
-      console.log(`✓ Socket.io listening on ws://localhost:${PORT}`);
-      console.log(`✓ CORS enabled for ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
+    try {
+      await connectDB();
+      console.log("✓ Database connected successfully");
+    } catch (dbErr: unknown) {
+      console.warn("⚠️ Could not connect to MongoDB - starting server without DB:", getErrorMessage(dbErr));
+    }
+
+    server.listen(PORT, HOST, () => {
+      console.log(`✓ Server running on http://${HOST}:${PORT}`);
+      console.log(`✓ Socket.io listening on ws://${HOST}:${PORT}`);
+      console.log(`✓ CORS enabled for ${allowedOrigins.join(", ")}`);
     });
   } catch (error) {
     console.error("✗ Failed to start server:", error);
-    process.exit(1);
+    // Do not exit process here to allow the server to run in degraded mode for local development
+    // process.exit(1);
   }
 };
 

@@ -10,7 +10,7 @@ interface PageSEOProps {
 
 const BASE_URL = "https://scholarshine-connect.app";
 const SITE_NAME = "Government Graduate College, Shahdara, Lahore";
-const OG_IMAGE = "/favicon.ico";
+const OG_IMAGE = "/favoicon.ico"; // Replace with your actual OG image URL
 
 const PageSEO = ({ title, description, path, type = "website", keywords }: PageSEOProps) => {
   const fullUrl = `${BASE_URL}${path}`;

@@ -1,7 +1,8 @@
 // Socket.io client connection and event handlers
 import { io, Socket } from "socket.io-client";
+import { getSocketBaseUrl } from "./api-url";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:3000";
+const SOCKET_URL = getSocketBaseUrl();
 
 let socket: Socket | null = null;
 

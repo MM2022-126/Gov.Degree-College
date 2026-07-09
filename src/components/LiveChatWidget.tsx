@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { getSocket } from "@/lib/socket-client";
 import TypingIndicator from "@/components/TypingIndicator";
 import { MessageCircle, X, Send, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { getApiBaseUrl } from "@/lib/api-url";
+import { mergeChatMessages } from "@/lib/chat";
 
 interface ChatMessage {
   _id?: string;
@@ -65,106 +66,90 @@ const LiveChatWidget = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [adminTyping, setAdminTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<number | null>(null);
+  const fetchingRef = useRef(false);
+  const backoffRef = useRef(3000);
+  const pausePollingUntil = useRef(0);
   const sessionId = useRef(getSessionId()).current;
-  const socketRef = useRef(getSocket());
 
-  // Socket event handlers - remove listeners first to prevent duplicates
   useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
+    if (!isOpen || showNameForm) return;
 
-    // Remove any existing listeners FIRST (prevents duplicates on re-mount/re-render)
-    socket.off("connect");
-    socket.off("disconnect");
-    socket.off("message_received");
-    socket.off("reply_sent");
-    socket.off("admin_typing");
+    let isCancelled = false;
 
-    // Register listeners ONCE
-    socket.on("connect", () => {
-      setIsConnected(true);
-      // DEBUG: Chat connected
-    });
+    const shouldPoll = () => document.visibilityState === "visible";
 
-    socket.on("disconnect", () => {
-      setIsConnected(false);
-      // DEBUG: Chat disconnected
-    });
+    const loadMessages = async () => {
+      if (isCancelled) return;
+      if (!shouldPoll()) return;
+      if (fetchingRef.current) return; // prevent overlapping requests
+      if (Date.now() < pausePollingUntil.current) return; // pause polling after send
+      fetchingRef.current = true;
 
-    // Receive messages from server - handles both optimistic replacements and new messages
-    const handleMessageReceived = (msg: ChatMessage) => {
-      setMessages((prev) => {
-        // CRITICAL: Check for duplicates by _id and tempId before adding
-        const exists = prev.some(m => 
-          m._id === msg._id || 
-          (m._id?.startsWith('temp_') && m._id === msg._id) ||
-          (msg.tempId && m._id?.startsWith('temp_') && prev.some(tm => tm._id?.includes(msg.tempId!)))
-        );
-        
-        if (exists) {
-          // Replace optimistic message with server-confirmed one
-          return prev.map(m => {
-            if (m._id?.startsWith('temp_') && msg.tempId && m._id?.includes(msg.tempId)) {
-              return msg;
-            }
-            if (m._id === msg._id) {
-              return msg;
-            }
-            return m;
-          });
+      try {
+        const controller = new AbortController();
+        const response = await fetch(`${getApiBaseUrl()}/chat-messages?sessionId=${encodeURIComponent(sessionId)}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Failed to load messages");
+
+        const data = await response.json();
+        if (Array.isArray(data) && !isCancelled) {
+          setMessages((prev) => mergeChatMessages(prev, data));
+          setIsConnected(true);
+          backoffRef.current = 3000; // reset backoff after success
         }
-        return [...prev, msg];
-      });
+      } catch (error) {
+        console.error(error);
+        if (!isCancelled) {
+          setIsConnected(false);
+          // incremental backoff up to 30s
+          backoffRef.current = Math.min(backoffRef.current * 1.5, 30000);
+        }
+      } finally {
+        fetchingRef.current = false;
+      }
     };
 
-    socket.on("message_received", handleMessageReceived);
+    const startPolling = () => {
+      if (pollingRef.current) return;
+      pollingRef.current = window.setInterval(() => {
+        loadMessages();
+      }, backoffRef.current) as unknown as number;
+    };
 
-    // Receive admin replies
-    socket.on("reply_sent", (msg: ChatMessage) => {
-      setMessages((prev) => {
-        if (prev.some(m => m._id === msg._id)) return prev;
-        return [...prev, msg];
-      });
-    });
+    const stopPolling = () => {
+      if (!pollingRef.current) return;
+      window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    };
 
-    socket.on("admin_typing", ({ isTyping }: { isTyping: boolean }) => {
-      setAdminTyping(isTyping);
-    });
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        loadMessages();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    // initial fetch + start polling when visible
+    loadMessages();
+    startPolling();
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      socket.off("message_received", handleMessageReceived);
-      socket.off("reply_sent");
-      socket.off("admin_typing");
-      socket.off("connect");
-      socket.off("disconnect");
+      isCancelled = true;
+      stopPolling();
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, []);
-
-  // Join room on mount (for receiving messages in this session)
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (socket && sessionId && showNameForm === false) {
-      socket.emit("join_room", sessionId);
-    }
-  }, [sessionId, showNameForm]);
-
-  // Load message history when chat opens
-  useEffect(() => {
-    if (isOpen && showNameForm === false) {
-      fetch(`${import.meta.env.VITE_API_URL}/chat-messages?sessionId=${sessionId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setMessages(data);
-          }
-        })
-        .catch(console.error);
-    }
   }, [isOpen, showNameForm, sessionId]);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom with a small delay to ensure DOM is rendered
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const timer = setTimeout(() => {
+      if (!messagesEndRef.current) return;
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [messages, adminTyping]);
 
   const startChat = useCallback(() => {
@@ -176,27 +161,16 @@ const LiveChatWidget = () => {
 
     setShowNameForm(false);
     setVisitorName(name);
-    
-    // Join the room
-    const socket = socketRef.current;
-    if (socket) {
-      socket.emit("join_room", sessionId);
-    }
+    setIsConnected(true);
 
     toast({ title: "Chat started", description: "Connected to support" });
   }, [visitorName, sessionId, toast]);
 
-  const sendMessage = useCallback(() => {
+  const sendMessage = useCallback(async () => {
     const text = message.trim();
-    if (!text) return;
+    if (!text || showNameForm) return;
 
-    const socket = socketRef.current;
-    if (!socket || showNameForm) return;
-
-    // Generate unique tempId for optimistic message deduplication
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
-    // Optimistic UI - show message immediately with tempId
     const optimisticMsg: ChatMessage = {
       _id: tempId,
       sessionId,
@@ -205,20 +179,39 @@ const LiveChatWidget = () => {
       name: visitorName,
       senderDisplayName: visitorName,
       timestamp: new Date().toISOString(),
-      read: false
+      read: false,
+      tempId,
     };
-    setMessages(prev => [...prev, optimisticMsg]);
+
+    setMessages(prev => mergeChatMessages(prev, [optimisticMsg]));
     setMessage("");
 
-    // Emit to server — include tempId so server echoes it back
-    socket.emit("user_message", {
-      sessionId,
-      text,
-      name: visitorName,
-      sender: "user",
-      tempId  // Server must include this in the saved document and broadcast
-    });
-  }, [message, sessionId, visitorName, showNameForm]);
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/chat-messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          text,
+          name: visitorName,
+          sender: "user",
+          senderDisplayName: visitorName,
+          tempId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Failed to send message");
+
+      setMessages(prev => mergeChatMessages(prev, [data]));
+      setIsConnected(true);
+      pausePollingUntil.current = Date.now() + 2000; // pause polling for 2s to avoid race condition
+    } catch (error) {
+      console.error(error);
+      setMessages(prev => prev.filter(msg => msg._id !== tempId));
+      toast({ title: "Message not sent", description: "Please try again", variant: "destructive" });
+    }
+  }, [message, sessionId, visitorName, showNameForm, toast]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -314,7 +307,7 @@ const LiveChatWidget = () => {
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3 scroll-smooth" style={{ scrollBehavior: "smooth" }}>
             {messages.length === 0 && (
               <p className="text-center text-gray-400 py-4 text-sm">
                 Send a message to start the conversation
@@ -328,7 +321,7 @@ const LiveChatWidget = () => {
                 <TypingIndicator />
               </div>
             )}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-1 shrink-0" />
           </div>
 
           {/* Message Input */}

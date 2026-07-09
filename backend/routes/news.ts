@@ -18,7 +18,7 @@ function generateSlug(title: string): string {
 router.get("/news", async (req, res) => {
   try {
     const news = await News.find({ isPublished: true })
-      .sort({ date: -1, createdAt: -1 })
+      .sort({ date: -1, created_at: -1 })
       .lean();
     res.json(news);
   } catch (error) {

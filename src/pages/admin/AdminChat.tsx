@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
-import { getSocket } from "@/lib/socket-client";
-import TypingIndicator from "@/components/TypingIndicator";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Send, MessageCircle, User, Clock, Check, CheckCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getApiBaseUrl } from "@/lib/api-url";
+import { mergeChatMessages, normalizeAdminChatConversations } from "@/lib/chat";
 
 interface Message {
   _id?: string;
@@ -95,123 +95,49 @@ const AdminChat = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [replyText, setReplyText] = useState("");
-  const [isAdminTyping, setIsAdminTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef(getSocket());
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Socket connection and admin room join
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
+  const loadConversations = useCallback(async () => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/chat-messages/all`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to load conversations");
 
-    // Remove existing listeners first
-    socket.off("new_message");
-    socket.off("reply_sent");
-    socket.off("connect");
-    socket.off("joined_admin");
+      const data = await response.json();
+      if (!Array.isArray(data)) return;
 
-    // Join admin room immediately
-    const joinAdmin = () => {
-      socket.emit("join_admin");
-      // DEBUG: Admin joined admin_room
-    };
+      const normalized = normalizeAdminChatConversations(data);
 
-    // Join on connect (handles reconnection too)
-    if (socket.connected) {
-      joinAdmin();
-    }
-    socket.on("connect", joinAdmin);
+      setConversations(normalized);
 
-    // Listen for confirmation
-    socket.on("joined_admin", ({ success }: { success: boolean }) => {
-      if (success) {
-        // DEBUG: Successfully joined admin room
-      }
-    });
-
-    // Listen for new messages from users
-    const handleNewMessage = (msg: Message) => {
-      // DEBUG: Admin received new message
-      setConversations(prev => {
-        const existingIndex = prev.findIndex(c => c.sessionId === msg.sessionId);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            messages: [...updated[existingIndex].messages, msg],
-            lastMessage: msg,
-            unreadCount: updated[existingIndex].unreadCount + 1
-          };
-          return updated;
-        } else {
-          return [{
-            sessionId: msg.sessionId,
-            messages: [msg],
-            lastMessage: msg,
-            unreadCount: 1,
-            visitorName: msg.senderDisplayName || msg.name || "Visitor"
-          }, ...prev];
+      if (activeSessionId) {
+        const selected = normalized.find((convo: Conversation) => convo.sessionId === activeSessionId);
+        if (selected) {
+          setActiveMessages(selected.messages);
         }
-      });
-
-      // If this conversation is currently open, add message to it
-      if (activeSessionId === msg.sessionId) {
-        setActiveMessages(prev => {
-          if (prev.some(m => m._id === msg._id)) return prev;
-          return [...prev, msg];
-        });
       }
+    } catch (error) {
+      console.error(error);
+    }
+  }, [activeSessionId]);
 
-      // Play notification
-      toast({ title: "New message", description: `From ${msg.senderDisplayName || msg.name || "Visitor"}` });
-    };
-
-    socket.on("new_message", handleNewMessage);
-
-    // Listen for confirmation of admin replies
-    const handleReplySent = (msg: Message) => {
-      setActiveMessages(prev => {
-        if (prev.some(m => m._id === msg._id)) return prev;
-        return [...prev, msg];
-      });
-
-      // Update conversation's last message
-      setConversations(prev =>
-        prev.map(c =>
-          c.sessionId === msg.sessionId
-            ? { ...c, lastMessage: msg, messages: [...c.messages, msg] }
-            : c
-        )
-      );
-    };
-
-    socket.on("reply_sent", handleReplySent);
-
-    return () => {
-      socket.off("new_message", handleNewMessage);
-      socket.off("reply_sent", handleReplySent);
-      socket.off("connect", joinAdmin);
-      socket.off("joined_admin");
-    };
-  }, [activeSessionId, toast]);
-
-  // Load conversation messages when session selected
   useEffect(() => {
-    if (!activeSessionId) return;
+    loadConversations();
+    const interval = window.setInterval(loadConversations, 3000);
+    return () => window.clearInterval(interval);
+  }, [loadConversations]);
 
-    // Find or fetch messages for this session
-    const convo = conversations.find(c => c.sessionId === activeSessionId);
+  useEffect(() => {
+    if (!activeSessionId) {
+      setActiveMessages([]);
+      return;
+    }
+
+    const convo = conversations.find((item) => item.sessionId === activeSessionId);
     if (convo) {
       setActiveMessages(convo.messages);
-      // Mark all messages as read
-      setConversations(prev =>
-        prev.map(c =>
-          c.sessionId === activeSessionId
-            ? { ...c, unreadCount: 0 }
-            : c
-        )
-      );
+      setConversations((prev) => prev.map((item) => item.sessionId === activeSessionId ? { ...item, unreadCount: 0 } : item));
     }
   }, [activeSessionId, conversations]);
 
@@ -220,42 +146,51 @@ const AdminChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeMessages]);
 
-  const sendAdminReply = useCallback(() => {
+  const sendAdminReply = useCallback(async () => {
     const text = replyText.trim();
     if (!text || !activeSessionId) return;
 
-    setReplyText("");
-    setIsAdminTyping(false);
-
-    const socket = socketRef.current;
-    if (!socket) return;
-
-    socket.emit("admin_reply", {
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const optimisticMsg: Message = {
+      _id: tempId,
       sessionId: activeSessionId,
-      text,
       sender: "admin",
-      senderDisplayName: "Admin"
-    });
-  }, [replyText, activeSessionId]);
+      text,
+      senderDisplayName: "Admin",
+      timestamp: new Date().toISOString(),
+      read: true,
+      tempId,
+    };
 
-  const handleTyping = useCallback(() => {
-    if (!isAdminTyping) {
-      setIsAdminTyping(true);
-      const socket = socketRef.current;
-      if (socket && activeSessionId) {
-        socket.emit("admin_typing", { isTyping: true, sessionId: activeSessionId });
-      }
+    setReplyText("");
+    setActiveMessages((prev) => mergeChatMessages(prev, [optimisticMsg]));
+    setConversations((prev) => prev.map((convo) => convo.sessionId === activeSessionId ? { ...convo, lastMessage: optimisticMsg, messages: mergeChatMessages(convo.messages, [optimisticMsg]) } : convo));
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/chat-messages`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: activeSessionId,
+          text,
+          sender: "admin",
+          senderDisplayName: "Admin",
+          read: true,
+          tempId,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Failed to send reply");
+
+      setActiveMessages((prev) => mergeChatMessages(prev, [data]));
+      setConversations((prev) => prev.map((convo) => convo.sessionId === activeSessionId ? { ...convo, lastMessage: data, messages: mergeChatMessages(convo.messages, [data]) } : convo));
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Reply not sent", description: "Please try again", variant: "destructive" });
     }
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsAdminTyping(false);
-      const socket = socketRef.current;
-      if (socket && activeSessionId) {
-        socket.emit("admin_typing", { isTyping: false, sessionId: activeSessionId });
-      }
-    }, 2000);
-  }, [isAdminTyping, activeSessionId]);
+  }, [replyText, activeSessionId, toast]);
 
   const activeConvo = activeSessionId ? conversations.find(c => c.sessionId === activeSessionId) : null;
 
@@ -327,11 +262,8 @@ const AdminChat = () => {
                   <Input
                     placeholder="Type a reply..."
                     value={replyText}
-                    onChange={(e) => {
-                      setReplyText(e.target.value);
-                      handleTyping();
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendAdminReply()}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void sendAdminReply()}
                   />
                   <Button
                     onClick={sendAdminReply}

@@ -53,7 +53,7 @@ const AdminMedia = () => {
   const fetchMedia = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:3000/api/media', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL?.trim() || '/api'}/media`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to fetch media');
@@ -115,7 +115,7 @@ const AdminMedia = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const uploadRes = await fetch('http://localhost:3000/api/upload', {
+      const uploadRes = await fetch(`${import.meta.env.VITE_API_URL?.trim() || '/api'}/upload`, {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -125,7 +125,7 @@ const AdminMedia = () => {
       const { url, publicId } = await uploadRes.json();
 
       // Step 2: Save metadata to MongoDB
-      const mediaRes = await fetch('http://localhost:3000/api/media', {
+      const mediaRes = await fetch(`${import.meta.env.VITE_API_URL?.trim() || '/api'}/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -166,7 +166,7 @@ const AdminMedia = () => {
     if (!confirm('Are you sure you want to delete this image?')) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/media/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL?.trim() || '/api'}/media/${id}`, {
         method: 'DELETE',
         credentials: 'include'
       });

@@ -30,9 +30,10 @@ const Gallery = () => {
 
   useEffect(() => {
     setLoading(true);
+    const baseUrl = import.meta.env.VITE_API_URL?.trim() || "/api";
     const url = activeCategory === "all"
-      ? "http://localhost:3000/api/media?limit=100"
-      : `http://localhost:3000/api/media?category=${activeCategory}&limit=100`;
+      ? `${baseUrl}/media?limit=100`
+      : `${baseUrl}/media?category=${activeCategory}&limit=100`;
 
     fetch(url)
       .then(r => {

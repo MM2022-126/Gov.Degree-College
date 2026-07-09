@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+import { getApiBaseUrl } from "./api-url";
+
+const API_URL = getApiBaseUrl();
 
 // Helper function for API calls with credentials
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
