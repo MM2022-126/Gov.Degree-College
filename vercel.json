@@ -1,5 +1,11 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install --legacy-peer-deps",
+  "fluid": true,
+  "functions": {
+    "src/app/api/ws/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }

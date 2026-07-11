@@ -74,17 +74,23 @@ export function clearAuthCookie(response: NextResponse) {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const Settings = (await import('@/models/Settings')).default
-  await connectDBForAuth()
-  const hashSetting = await Settings.findOne({ key: 'admin_password_hash' })
-  if (hashSetting?.value) {
-    return bcrypt.compare(password, hashSetting.value)
-  }
-  if (process.env.ADMIN_PASSWORD_HASH) {
-    return bcrypt.compare(password, process.env.ADMIN_PASSWORD_HASH)
+  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
+  if (envHash && !envHash.includes('example.hash')) {
+    return bcrypt.compare(password, envHash)
   }
   if (process.env.ADMIN_PASSWORD) {
     return password === process.env.ADMIN_PASSWORD
+  }
+
+  try {
+    const Settings = (await import('@/models/Settings')).default
+    await connectDBForAuth()
+    const hashSetting = await Settings.findOne({ key: 'admin_password_hash' })
+    if (hashSetting?.value) {
+      return bcrypt.compare(password, hashSetting.value)
+    }
+  } catch {
+    return false
   }
   return false
 }

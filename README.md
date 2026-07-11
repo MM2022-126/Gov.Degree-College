@@ -22,7 +22,7 @@ There is **no separate Express backend**. All former `backend/` routes live unde
 - Admin CMS: News, Events, Announcements, Departments, Faculty, Media, Schedule, Live Chat
 - Admin authentication with cookie-based JWT
 - **Forgot password** flow for admin (`/admin/forgot-password`)
-- Live chat via HTTP API (Vercel-compatible)
+- Live chat via **WebSockets on Vercel Functions** (with HTTP polling fallback)
 - SEO: metadata, sitemap, robots.txt, JSON-LD structured data
 - Security: CSP headers, input sanitization, NoSQL injection guards, rate-limited login
 
@@ -79,7 +79,26 @@ npm start
 1. Import this repository in [Vercel](https://vercel.com)
 2. Framework preset: **Next.js** (auto-detected)
 3. Add all environment variables from `.env.local.example`
-4. Deploy — frontend and API deploy together on one domain
+4. **Enable real-time chat (recommended):** add [Upstash Redis](https://vercel.com/marketplace/upstash) from the Vercel Marketplace so WebSocket events sync across all serverless instances:
+   ```bash
+   vercel link
+   vercel integration add upstash
+   vercel env pull
+   ```
+   This sets `REDIS_URL` automatically. Without Redis, chat still works on a single function instance; polling fills gaps.
+5. Deploy — frontend, REST API, and WebSocket endpoint (`/api/ws`) deploy together on one domain
+
+**Fluid compute** is enabled in `vercel.json` (required for WebSockets on Vercel).
+
+### Local development with WebSockets
+
+WebSocket upgrades need the Vercel runtime locally:
+
+```bash
+npm run dev:vercel
+```
+
+Plain `npm run dev` works for UI/API, but `/api/ws` only upgrades correctly with `vercel dev` or in production on Vercel.
 
 No separate backend server or Render deployment is required.
 
@@ -88,13 +107,13 @@ No separate backend server or Render deployment is required.
 ```
 ├── src/
 │   ├── app/              # Next.js pages + API routes
-│   │   ├── api/          # All REST endpoints (/api/news, /api/events, …)
+│   │   ├── api/          # REST + WebSocket (/api/ws)
 │   │   ├── admin/        # Admin panel pages
 │   │   └── …             # Public pages
 │   ├── views/            # Page UI components
 │   ├── components/       # Shared React components
 │   ├── models/           # Mongoose schemas (17 models)
-│   └── lib/              # DB, auth, SEO, sanitization, Cloudinary
+│   └── lib/              # DB, auth, SEO, chat-realtime hub, Redis
 ├── middleware.ts         # Admin route protection
 ├── next.config.mjs       # Security headers, image domains
 └── public/               # Static assets
@@ -109,8 +128,8 @@ All endpoints are relative to `/api`:
 | `GET /api/health` | `POST /api/auth/login` |
 | `GET /api/news`, `/events`, `/departments` | CRUD on news, events, faculty, media, … |
 | `POST /api/contact` | `GET /api/admin/dashboard-stats` |
-| `GET/POST /api/chat-messages` | `POST /api/upload` |
-| `GET /api/settings` | `POST /api/auth/forgot-password` |
+| `GET/POST /api/chat-messages` | `GET /api/ws` (WebSocket live chat) |
+| `GET /api/settings` | `POST /api/upload`, `POST /api/auth/forgot-password` |
 
 ## License
 

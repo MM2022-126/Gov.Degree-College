@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Send, MessageCircle, User, Clock, Check, CheckCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { mergeChatMessages, normalizeAdminChatConversations } from "@/lib/chat";
+import { useChatRealtime } from "@/hooks/useChatRealtime";
 
 interface Message {
   _id?: string;
@@ -96,6 +97,7 @@ const AdminChat = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [replyText, setReplyText] = useState("");
+  const [wsConnected, setWsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(async () => {
@@ -123,11 +125,58 @@ const AdminChat = () => {
     }
   }, [activeSessionId]);
 
+  const { sendTyping } = useChatRealtime({
+    role: "admin",
+    enabled: true,
+    onConnectionChange: setWsConnected,
+    onMessage: (message) => {
+      setConversations((prev) => {
+        const existing = prev.find((c) => c.sessionId === message.sessionId);
+        const updatedMessages = mergeChatMessages(existing?.messages ?? [], [message as Message]);
+        const visitorName =
+          message.sender === "user"
+            ? message.name || message.senderDisplayName || "Visitor"
+            : existing?.visitorName || "Visitor";
+        const unreadCount =
+          message.sender === "user" && message.sessionId !== activeSessionId
+            ? (existing?.unreadCount ?? 0) + 1
+            : existing?.unreadCount ?? 0;
+
+        if (existing) {
+          return prev.map((c) =>
+            c.sessionId === message.sessionId
+              ? { ...c, messages: updatedMessages, lastMessage: message as Message, visitorName, unreadCount }
+              : c,
+          );
+        }
+
+        return [
+          {
+            sessionId: message.sessionId,
+            messages: updatedMessages,
+            lastMessage: message as Message,
+            unreadCount: message.sessionId === activeSessionId ? 0 : 1,
+            visitorName,
+          },
+          ...prev,
+        ];
+      });
+
+      if (message.sessionId === activeSessionId) {
+        setActiveMessages((prev) => mergeChatMessages(prev, [message as Message]));
+      }
+    },
+    onConversationUpdate: () => {
+      void loadConversations();
+    },
+  });
+
   useEffect(() => {
     loadConversations();
+    if (wsConnected) return;
     const interval = window.setInterval(loadConversations, 3000);
     return () => window.clearInterval(interval);
-  }, [loadConversations]);
+  }, [loadConversations, wsConnected]);
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -201,6 +250,9 @@ const AdminChat = () => {
         <div className="flex items-center gap-2">
           <MessageCircle className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">Live Chat Support</h1>
+          <Badge variant={wsConnected ? "default" : "secondary"} className="text-xs">
+            {wsConnected ? "WebSocket live" : "Polling fallback"}
+          </Badge>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
@@ -263,7 +315,12 @@ const AdminChat = () => {
                   <Input
                     placeholder="Type a reply..."
                     value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
+                    onChange={(e) => {
+                      setReplyText(e.target.value);
+                      if (activeSessionId) {
+                        sendTyping(activeSessionId, e.target.value.length > 0, "admin");
+                      }
+                    }}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void sendAdminReply()}
                   />
                   <Button

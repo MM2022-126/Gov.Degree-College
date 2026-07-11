@@ -22,6 +22,7 @@ import EventGallery from '@/models/EventGallery'
 import Media from '@/models/Media'
 import Events from '@/models/Events'
 import News from '@/models/News'
+import { broadcastChatMessage } from '@/lib/chat-realtime/hub'
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status })
@@ -325,6 +326,18 @@ export async function dispatchApi(req: NextRequest, pathSegments: string[]): Pro
         read: b.sender === 'admin',
         timestamp: new Date(),
         tempId: b.tempId || null,
+      })
+      const plain = doc.toObject ? doc.toObject() : doc
+      void broadcastChatMessage({
+        _id: String(plain._id),
+        sessionId: plain.sessionId,
+        sender: plain.sender,
+        text: plain.text,
+        name: plain.name,
+        senderDisplayName: plain.senderDisplayName,
+        timestamp: new Date(plain.timestamp).toISOString(),
+        read: plain.read,
+        tempId: plain.tempId,
       })
       return json(doc, 201)
     }

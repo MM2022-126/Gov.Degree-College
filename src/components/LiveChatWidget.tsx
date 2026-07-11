@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { mergeChatMessages } from "@/lib/chat";
+import { useChatRealtime } from "@/hooks/useChatRealtime";
 
 interface ChatMessage {
   _id?: string;
@@ -67,6 +68,7 @@ const LiveChatWidget = () => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const [adminTyping, setAdminTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<number | null>(null);
@@ -75,12 +77,27 @@ const LiveChatWidget = () => {
   const pausePollingUntil = useRef(0);
   const sessionId = useRef(getSessionId()).current;
 
+  const { sendTyping } = useChatRealtime({
+    role: "visitor",
+    sessionId,
+    enabled: isOpen && !showNameForm,
+    onConnectionChange: setWsConnected,
+    onMessage: (message) => {
+      setMessages((prev) => mergeChatMessages(prev, [message as ChatMessage]));
+      setIsConnected(true);
+      if (message.sender === "admin") setAdminTyping(false);
+    },
+    onTyping: (sid, isTyping, sender) => {
+      if (sid === sessionId && sender === "admin") setAdminTyping(isTyping);
+    },
+  });
+
   useEffect(() => {
     if (!isOpen || showNameForm) return;
 
     let isCancelled = false;
 
-    const shouldPoll = () => document.visibilityState === "visible";
+    const shouldPoll = () => document.visibilityState === "visible" && !wsConnected;
 
     const loadMessages = async () => {
       if (isCancelled) return;
@@ -144,7 +161,7 @@ const LiveChatWidget = () => {
       stopPolling();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [isOpen, showNameForm, sessionId]);
+  }, [isOpen, showNameForm, sessionId, wsConnected]);
 
   // Auto scroll to bottom with a small delay to ensure DOM is rendered
   useEffect(() => {
@@ -244,7 +261,7 @@ const LiveChatWidget = () => {
               <div>
                 <h3 className="font-display font-bold text-sm">Live Chat Support</h3>
                 <p className="text-xs opacity-80">
-                  {isConnected ? "Govt. Graduate College" : "Connecting..."}
+                  {wsConnected || isConnected ? "Govt. Graduate College · Live" : "Connecting..."}
                 </p>
               </div>
               <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-primary-foreground/10 rounded">
@@ -296,7 +313,7 @@ const LiveChatWidget = () => {
             <div>
               <h3 className="font-display font-bold text-sm">Live Chat Support</h3>
               <p className="text-xs opacity-80">
-                {isConnected ? "Govt. Graduate College" : "Connecting..."}
+                {wsConnected || isConnected ? "Govt. Graduate College · Live" : "Connecting..."}
               </p>
             </div>
             <div className="flex gap-1">
@@ -333,15 +350,18 @@ const LiveChatWidget = () => {
               <Input
                 placeholder="Type your message..."
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  sendTyping(sessionId, e.target.value.length > 0, "user");
+                }}
                 onKeyDown={handleKeyDown}
-                disabled={!isConnected}
+                disabled={!isConnected && !wsConnected}
                 className="flex-1 text-sm"
               />
               <Button 
                 onClick={sendMessage} 
                 size="icon" 
-                disabled={!message.trim() || !isConnected}
+                disabled={!message.trim() || (!isConnected && !wsConnected)}
               >
                 <Send className="h-4 w-4" />
               </Button>

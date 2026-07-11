@@ -1,52 +1,53 @@
-// Socket.io client stub for serverless deployments
-// Replaces real socket connections with no-op implementations so the app
-// relies on REST polling when deployed to Vercel-only environments.
+// Real-time chat uses native WebSockets via /api/ws (Vercel Fluid compute).
+// Legacy Socket.io API surface — kept for useSocket hook compatibility.
 
-export const getSocket = () => {
-  console.debug('[socket-client] stub getSocket called');
-  return null as any;
-};
+import type { ChatMessagePayload } from '@/lib/chat-realtime/protocol'
 
-export const joinConversation = (_conversationId: string) => {
-  console.debug('[socket-client] joinConversation (stub)');
-};
+type Listener = (data: unknown) => void
 
-export const leaveConversation = (_conversationId: string) => {
-  console.debug('[socket-client] leaveConversation (stub)');
-};
+const listeners: {
+  message: Set<Listener>
+  typing: Set<Listener>
+  read: Set<Listener>
+  conversation: Set<Listener>
+} = {
+  message: new Set(),
+  typing: new Set(),
+  read: new Set(),
+  conversation: new Set(),
+}
 
-export const sendMessage = (_conversationId: string, _message: string, _senderType: 'visitor' | 'admin', _senderName: string) => {
-  console.debug('[socket-client] sendMessage (stub)');
-};
+/** @deprecated Prefer useChatRealtime hook — returns null on Vercel WebSocket setup */
+export const getSocket = () => null as any
 
-export const sendTyping = (_conversationId: string, _isTyping: boolean, _sender: 'visitor' | 'admin') => {
-  /* no-op */
-};
+export const joinConversation = (_conversationId: string) => {}
 
-export const markAsRead = (_conversationId: string, _messageIds: string[]) => {
-  /* no-op */
-};
+export const leaveConversation = (_conversationId: string) => {}
 
-export const onNewMessage = (callback: (message: any) => void) => {
-  console.debug('[socket-client] onNewMessage (stub)');
-  return () => {};
-};
+export const sendMessage = (_conversationId: string, _message: string, _senderType: 'visitor' | 'admin', _senderName: string) => {}
 
-export const onUserTyping = (callback: (data: any) => void) => {
-  console.debug('[socket-client] onUserTyping (stub)');
-  return () => {};
-};
+export const sendTyping = (_conversationId: string, _isTyping: boolean, _sender: 'visitor' | 'admin') => {}
 
-export const onMessagesRead = (callback: (data: any) => void) => {
-  console.debug('[socket-client] onMessagesRead (stub)');
-  return () => {};
-};
+export const markAsRead = (_conversationId: string, _messageIds: string[]) => {}
 
-export const onConversationUpdated = (callback: (data: any) => void) => {
-  console.debug('[socket-client] onConversationUpdated (stub)');
-  return () => {};
-};
+export const onNewMessage = (callback: (message: ChatMessagePayload) => void) => {
+  listeners.message.add(callback as Listener)
+  return () => listeners.message.delete(callback as Listener)
+}
 
-export const disconnectSocket = () => {
-  console.debug('[socket-client] disconnectSocket (stub)');
-};
+export const onUserTyping = (callback: (data: { isTyping: boolean; senderType?: string }) => void) => {
+  listeners.typing.add(callback as Listener)
+  return () => listeners.typing.delete(callback as Listener)
+}
+
+export const onMessagesRead = (callback: (data: { messageIds: string[] }) => void) => {
+  listeners.read.add(callback as Listener)
+  return () => listeners.read.delete(callback as Listener)
+}
+
+export const onConversationUpdated = (callback: (data: unknown) => void) => {
+  listeners.conversation.add(callback as Listener)
+  return () => listeners.conversation.delete(callback as Listener)
+}
+
+export const disconnectSocket = () => {}
