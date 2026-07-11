@@ -74,14 +74,7 @@ export function clearAuthCookie(response: NextResponse) {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
-  if (envHash && !envHash.includes('example.hash')) {
-    return bcrypt.compare(password, envHash)
-  }
-  if (process.env.ADMIN_PASSWORD) {
-    return password === process.env.ADMIN_PASSWORD
-  }
-
+  // DB hash (set via forgot-password reset) takes precedence when present.
   try {
     const Settings = (await import('@/models/Settings')).default
     await connectDBForAuth()
@@ -90,7 +83,15 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
       return bcrypt.compare(password, hashSetting.value)
     }
   } catch {
-    return false
+    // fall through to env-based auth
+  }
+
+  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
+  if (envHash && !envHash.includes('example.hash')) {
+    return bcrypt.compare(password, envHash)
+  }
+  if (process.env.ADMIN_PASSWORD) {
+    return password === process.env.ADMIN_PASSWORD
   }
   return false
 }

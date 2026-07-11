@@ -40,6 +40,4 @@ const PrincipalSchema = new Schema<IPrincipal>(
   { timestamps: true }
 );
 
-const Principal = mongoose.model<IPrincipal>("Principal", PrincipalSchema);
-
-export default Principal;
+export default mongoose.models.Principal || mongoose.model<IPrincipal>('Principal', PrincipalSchema)

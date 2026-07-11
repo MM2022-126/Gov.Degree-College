@@ -98,6 +98,8 @@ const AdminChat = () => {
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [replyText, setReplyText] = useState("");
   const [wsConnected, setWsConnected] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const pollBackoffRef = useRef(3000);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadConversations = useCallback(async () => {
@@ -105,11 +107,16 @@ const AdminChat = () => {
       const response = await fetch(`/api/chat-messages/all`, {
         credentials: "include",
       });
-      if (!response.ok) throw new Error("Failed to load conversations");
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || "Failed to load conversations");
+      }
 
       const data = await response.json();
       if (!Array.isArray(data)) return;
 
+      pollBackoffRef.current = 3000;
+      setFetchError(null);
       const normalized = normalizeAdminChatConversations(data);
 
       setConversations(normalized);
@@ -121,7 +128,9 @@ const AdminChat = () => {
         }
       }
     } catch (error) {
-      console.error(error);
+      const message = error instanceof Error ? error.message : "Failed to load conversations";
+      setFetchError(message);
+      pollBackoffRef.current = Math.min(pollBackoffRef.current * 1.5, 30000);
     }
   }, [activeSessionId]);
 
@@ -172,10 +181,19 @@ const AdminChat = () => {
   });
 
   useEffect(() => {
-    loadConversations();
+    void loadConversations();
     if (wsConnected) return;
-    const interval = window.setInterval(loadConversations, 3000);
-    return () => window.clearInterval(interval);
+
+    let timer: number;
+    const schedule = () => {
+      timer = window.setTimeout(async () => {
+        await loadConversations();
+        schedule();
+      }, pollBackoffRef.current);
+    };
+    schedule();
+
+    return () => window.clearTimeout(timer);
   }, [loadConversations, wsConnected]);
 
   useEffect(() => {
@@ -251,9 +269,14 @@ const AdminChat = () => {
           <MessageCircle className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold">Live Chat Support</h1>
           <Badge variant={wsConnected ? "default" : "secondary"} className="text-xs">
-            {wsConnected ? "WebSocket live" : "Polling fallback"}
+            {wsConnected ? "WebSocket live" : "Polling (local dev)"}
           </Badge>
         </div>
+        {fetchError && (
+          <p className="text-sm text-destructive">
+            Database unavailable: {fetchError.includes("querySrv") ? "MongoDB Atlas DNS connection failed — check network and MONGODB_URI in .env" : fetchError}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
           {/* Conversations List */}

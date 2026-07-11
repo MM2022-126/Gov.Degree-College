@@ -19,6 +19,17 @@ function getWsUrl(): string {
   return `${protocol}//${window.location.host}/api/ws`
 }
 
+function isWebSocketSupported(): boolean {
+  if (typeof window === 'undefined') return false
+  if (process.env.NEXT_PUBLIC_ENABLE_WS === 'true') return true
+  if (process.env.NEXT_PUBLIC_ENABLE_WS === 'false') return false
+  // /api/ws requires Vercel runtime — plain `next dev` cannot upgrade WebSockets.
+  if (process.env.NODE_ENV === 'development' && window.location.hostname === 'localhost') {
+    return false
+  }
+  return true
+}
+
 export function useChatRealtime(options: Options) {
   const {
     sessionId,
@@ -54,6 +65,11 @@ export function useChatRealtime(options: Options) {
   useEffect(() => {
     mountedRef.current = true
     if (!enabled || typeof window === 'undefined') return
+
+    if (!isWebSocketSupported()) {
+      onConnectionChange?.(false)
+      return
+    }
 
     const connect = () => {
       if (!mountedRef.current) return

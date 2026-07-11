@@ -113,7 +113,6 @@ const AdminEventsNew = () => {
   const [uploadProgress, setUploadProgress] = useState("");
   const [editingSpeakerIdx, setEditingSpeakerIdx] = useState<number | null>(null);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const [form, setForm] = useState({
     title: "",
@@ -159,6 +158,7 @@ const AdminEventsNew = () => {
       setEvents((data as Event[]) || []);
     } catch (error) {
       console.error("Failed to fetch events:", error);
+      toast({ title: "Error", description: "Failed to fetch events", variant: "destructive" });
     } finally {
       setLoading(false);
     }

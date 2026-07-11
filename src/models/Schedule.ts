@@ -33,6 +33,4 @@ const ScheduleSchema = new Schema<ISchedule>(
   { timestamps: true }
 );
 
-const Schedule = mongoose.model<ISchedule>("Schedule", ScheduleSchema);
-
-export default Schedule;
+export default mongoose.models.Schedule || mongoose.model<ISchedule>('Schedule', ScheduleSchema)

@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const email = sanitizeText(body.email, 254)
     const password = String(body.password || '')
 
-    if (!email || !password) return jsonError('Email and password required', 400)
+    if (!email || !password) return jsonError('Email and password are required', 400)
     if (!isValidAdminEmail(email)) return jsonError('Invalid credentials', 401)
 
     const valid = await verifyAdminPassword(password)
