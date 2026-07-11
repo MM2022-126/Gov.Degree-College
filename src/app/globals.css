@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 215 70% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 42 95% 55%;
+    --secondary-foreground: 220 25% 10%;
+
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 215 50% 92%;
+    --accent-foreground: 215 70% 18%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 215 70% 18%;
+
+    --radius: 0.5rem;
+
+    --college-navy: 215 70% 18%;
+    --college-gold: 42 95% 55%;
+    --college-maroon: 350 65% 30%;
+    --college-cream: 40 30% 96%;
+    --college-dark: 220 25% 10%;
+
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Sans 3', system-ui, sans-serif;
+
+    --shadow-card: 0 4px 20px -4px hsl(215 70% 18% / 0.08);
+    --shadow-elevated: 0 10px 40px -10px hsl(215 70% 18% / 0.15);
+    --shadow-hero: 0 20px 60px -15px hsl(215 70% 18% / 0.25);
+
+    --gradient-navy: linear-gradient(135deg, hsl(215 70% 18%), hsl(215 60% 28%));
+    --gradient-gold: linear-gradient(135deg, hsl(42 95% 55%), hsl(38 90% 48%));
+    --gradient-hero-overlay: linear-gradient(180deg, hsl(215 70% 18% / 0.7) 0%, hsl(215 70% 18% / 0.4) 100%);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 20% 7%;
+    --foreground: 210 15% 90%;
+    --card: 220 18% 11%;
+    --card-foreground: 210 15% 90%;
+    --popover: 220 18% 11%;
+    --popover-foreground: 210 15% 90%;
+    --primary: 215 60% 28%;
+    --primary-foreground: 210 15% 95%;
+    --secondary: 42 85% 50%;
+    --secondary-foreground: 220 25% 10%;
+    --muted: 220 15% 16%;
+    --muted-foreground: 215 12% 55%;
+    --accent: 215 25% 18%;
+    --accent-foreground: 210 15% 90%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 12% 20%;
+    --input: 220 12% 20%;
+    --ring: 42 85% 50%;
+
+    --college-navy: 215 60% 28%;
+    --college-gold: 42 85% 50%;
+    --college-cream: 220 15% 14%;
+    --college-dark: 210 15% 90%;
+
+    --shadow-card: 0 4px 20px -4px hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 10px 40px -10px hsl(0 0% 0% / 0.4);
+    --shadow-hero: 0 20px 60px -15px hsl(0 0% 0% / 0.5);
+
+    --sidebar-background: 220 18% 9%;
+    --sidebar-foreground: 210 15% 90%;
+    --sidebar-primary: 42 85% 50%;
+    --sidebar-primary-foreground: 220 25% 10%;
+    --sidebar-accent: 220 15% 14%;
+    --sidebar-accent-foreground: 210 15% 90%;
+    --sidebar-border: 220 12% 18%;
+    --sidebar-ring: 42 85% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  .section-heading {
+    @apply text-3xl md:text-4xl font-bold text-primary mb-2;
+    font-family: var(--font-display);
+  }
+
+  .section-subheading {
+    @apply text-muted-foreground text-lg mb-8;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1;
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .ticker-scroll {
+    animation: ticker 30s linear infinite;
+  }
+
+  @keyframes ticker {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.6s ease-out forwards;
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.5s ease-out forwards;
+  }
+}

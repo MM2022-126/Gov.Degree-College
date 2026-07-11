@@ -1,5 +1,8 @@
+'use client'
+
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, Search, ChevronDown } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import collegeLogo from "@/assets/college-logo.png";
@@ -26,9 +29,9 @@ const navItems = [
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const location = useLocation();
+  const pathname = usePathname();
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => pathname === path;
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
@@ -39,10 +42,10 @@ const Header = () => {
             Welcome to Government Graduate College — Ravi Road, Shahdara, Lahore — Established 1970
           </span>
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/contact" className="text-primary-foreground text-sm hover:text-secondary transition-colors">
+            <Link href="/contact" className="text-primary-foreground text-sm hover:text-secondary transition-colors">
               Contact
             </Link>
-            <Link to="/admin" className="text-primary-foreground text-sm hover:text-secondary transition-colors">
+            <Link href="/admin" className="text-primary-foreground text-sm hover:text-secondary transition-colors">
               Admin Portal
             </Link>
           </div>
@@ -52,8 +55,8 @@ const Header = () => {
       {/* Main nav */}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/" className="flex items-center gap-3">
-            <img src={collegeLogo} alt="Government Graduate College Shahdara Lahore" className="h-12 md:h-14 w-auto" />
+          <Link href="/" className="flex items-center gap-3">
+            <img src={collegeLogo.src} alt="Government Graduate College Shahdara Lahore" className="h-12 md:h-14 w-auto" />
             <div className="hidden sm:block">
               <h1 className="font-display text-lg md:text-xl font-bold text-primary leading-tight">
                 Govt. Graduate College
@@ -72,7 +75,7 @@ const Header = () => {
                 onMouseLeave={() => setOpenDropdown(null)}
               >
                 <Link
-                  to={item.path}
+                  href={item.path}
                   className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-1 ${
                     isActive(item.path)
                       ? "bg-accent text-accent-foreground"
@@ -87,7 +90,7 @@ const Header = () => {
                     {item.children.map((child) => (
                       <Link
                         key={child.path}
-                        to={child.path}
+                        href={child.path}
                         className="block px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
                       >
                         {child.label}
@@ -98,7 +101,7 @@ const Header = () => {
               </div>
             ))}
             <Link
-              to="/search"
+              href="/search"
               className="ml-2 p-2 rounded-md text-muted-foreground hover:bg-accent transition-colors"
             >
               <Search className="h-4 w-4" />
@@ -126,7 +129,7 @@ const Header = () => {
             {navItems.map((item) => (
               <div key={item.label}>
                 <Link
-                  to={item.path}
+                  href={item.path}
                   onClick={() => setMobileOpen(false)}
                   className={`block px-3 py-2 rounded-md text-sm font-medium ${
                     isActive(item.path)
@@ -139,7 +142,7 @@ const Header = () => {
                 {item.children?.map((child) => (
                   <Link
                     key={child.path}
-                    to={child.path}
+                    href={child.path}
                     onClick={() => setMobileOpen(false)}
                     className="block pl-8 py-1.5 text-sm text-muted-foreground hover:text-foreground"
                   >

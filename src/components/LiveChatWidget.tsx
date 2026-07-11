@@ -1,10 +1,11 @@
+'use client'
+
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import TypingIndicator from "@/components/TypingIndicator";
 import { MessageCircle, X, Send, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { getApiBaseUrl } from "@/lib/api-url";
 import { mergeChatMessages } from "@/lib/chat";
 
 interface ChatMessage {
@@ -17,10 +18,12 @@ interface ChatMessage {
   senderDisplayName?: string;
   timestamp: string;
   read: boolean;
+  tempId?: string | null;
 }
 
 // Session ID generator - uses sessionStorage so it persists during session but clears on browser close
 const getSessionId = () => {
+  if (typeof window === 'undefined') return 'session_ssr'
   let id = sessionStorage.getItem("chat_session_id");
   if (!id) {
     id = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -88,7 +91,7 @@ const LiveChatWidget = () => {
 
       try {
         const controller = new AbortController();
-        const response = await fetch(`${getApiBaseUrl()}/chat-messages?sessionId=${encodeURIComponent(sessionId)}`, { signal: controller.signal });
+        const response = await fetch(`/api/chat-messages?sessionId=${encodeURIComponent(sessionId)}`, { signal: controller.signal });
         if (!response.ok) throw new Error("Failed to load messages");
 
         const data = await response.json();
@@ -187,7 +190,7 @@ const LiveChatWidget = () => {
     setMessage("");
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/chat-messages`, {
+      const response = await fetch(`/api/chat-messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

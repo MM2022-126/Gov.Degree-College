@@ -1,5 +1,8 @@
+'use client'
+
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, Calendar, Newspaper, Bell, BookOpen, Image, Users,
   LogOut, Menu, X, ChevronRight, GraduationCap, MessageCircle
@@ -24,86 +27,56 @@ interface AdminLayoutProps {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
+  const pathname = usePathname();
+  const router = useRouter();
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen bg-muted/30 flex">
+      {/* Sidebar overlay mobile */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-primary transform transition-transform lg:translate-x-0 lg:static ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-primary-foreground/10">
-          <Link to="/admin" className="text-primary-foreground font-display font-bold text-lg">
-            NCE Admin
-          </Link>
-          <button className="lg:hidden text-primary-foreground" onClick={() => setSidebarOpen(false)}>
-            <X className="h-5 w-5" />
-          </button>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-primary text-primary-foreground transform transition-transform lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="p-4 border-b border-primary-foreground/10 flex items-center justify-between">
+          <h2 className="font-display font-bold text-lg">Admin Panel</h2>
+          <button className="lg:hidden" onClick={() => setSidebarOpen(false)}><X className="h-5 w-5" /></button>
         </div>
-
-        <nav className="p-4 space-y-1 pb-32">
-          {sidebarItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                location.pathname === item.path
-                  ? "bg-primary-foreground/15 text-secondary"
-                  : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-              }`}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          ))}
+        <nav className="p-4 space-y-1">
+          {sidebarItems.map(item => {
+            const isActive = pathname === item.path || (item.path !== "/admin" && pathname.startsWith(item.path));
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${isActive ? "bg-secondary text-secondary-foreground" : "hover:bg-primary-foreground/10"}`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {isActive && <ChevronRight className="h-4 w-4 ml-auto" />}
+              </Link>
+            );
+          })}
         </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-primary-foreground/10 space-y-1">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors"
-          >
-            <ChevronRight className="h-5 w-5" />
-            Back to Website
-          </Link>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-primary-foreground/10">
           <button
-            onClick={() => { logout(); navigate("/admin/login"); }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors w-full"
+            onClick={async () => { await logout(); router.push("/admin/login"); }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm w-full hover:bg-primary-foreground/10 transition-colors"
           >
-            <LogOut className="h-5 w-5" />
-            Sign Out
+            <LogOut className="h-4 w-4" /> Logout
           </button>
         </div>
       </aside>
 
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-foreground/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 sticky top-0 z-30">
-          <button className="lg:hidden text-foreground" onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </button>
-          <div className="flex items-center text-sm text-muted-foreground">
-            <Link to="/admin" className="hover:text-foreground transition-colors">Admin</Link>
-            {location.pathname !== "/admin" && (
-              <>
-                <ChevronRight className="h-4 w-4 mx-1" />
-                <span className="text-foreground capitalize">
-                  {location.pathname.split("/").pop()}
-                </span>
-              </>
-            )}
-          </div>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-4 lg:hidden">
+          <button onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></button>
+          <span className="font-display font-semibold">Admin Panel</span>
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 overflow-auto">{children}</main>
       </div>
     </div>
   );

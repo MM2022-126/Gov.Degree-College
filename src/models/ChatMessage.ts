@@ -1,55 +1,23 @@
-// This is a Mongoose model template for backend use
-// Copy this to your backend models folder
-
-export interface IChatMessage {
-  _id?: string;
-  conversation_id: string;
-  sender_type: "visitor" | "admin" | "system";
-  sender_name: string;
-  message: string;
-  read_at?: Date | null;
-  created_at?: Date;
-  updated_at?: Date;
-}
-
-// Backend Mongoose Schema (for backend/models/ChatMessage.ts):
-/*
 import mongoose from "mongoose";
 
-const ChatMessageSchema = new mongoose.Schema(
-  {
-    conversation_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ChatConversation",
-      required: true,
-      index: true,
-    },
-    sender_type: {
-      type: String,
-      enum: ["visitor", "admin", "system"],
-      required: true,
-    },
-    sender_name: {
-      type: String,
-      required: true,
-    },
-    message: {
-      type: String,
-      required: true,
-    },
-    read_at: {
-      type: Date,
-      default: null,
-    },
+const chatMessageSchema = new mongoose.Schema({
+  sessionId: { type: String, required: true, index: true },
+  sender: { 
+    type: String, 
+    required: true, 
+    enum: ["user", "admin"]
   },
-  {
-    timestamps: true,
-    collection: "chat_messages",
-  }
-);
+  text: { type: String, required: true },
+  name: { type: String, default: "Visitor" },
+  senderDisplayName: { type: String, default: "" }, // "Admin" for admin messages, visitor name for user messages
+  read: { type: Boolean, default: false },
+  timestamp: { type: Date, default: Date.now },
+  tempId: { type: String, default: null } // Used for optimistic message deduplication
+}, { timestamps: true });
 
-ChatMessageSchema.index({ conversation_id: 1, created_at: 1 });
-ChatMessageSchema.index({ created_at: -1 });
+chatMessageSchema.index({ sessionId: 1, timestamp: -1 });
+chatMessageSchema.index({ sessionId: 1 });
 
-export default mongoose.model("ChatMessage", ChatMessageSchema);
-*/
+
+
+export default mongoose.models.ChatMessage || mongoose.model('ChatMessage', chatMessageSchema)

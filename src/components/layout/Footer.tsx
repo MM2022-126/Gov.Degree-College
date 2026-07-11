@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+'use client'
+
+import Link from "next/link";
 import { Mail, Phone, MapPin, Facebook, Twitter, Youtube, Linkedin } from "lucide-react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -44,7 +46,7 @@ const Footer = () => {
                 { label: "Gallery", path: "/gallery" },
               ].map((link) => (
                 <li key={link.path}>
-                  <Link to={link.path} className="opacity-80 hover:opacity-100 hover:text-secondary transition-all">
+                  <Link href={link.path} className="opacity-80 hover:opacity-100 hover:text-secondary transition-all">
                     {link.label}
                   </Link>
                 </li>
@@ -62,7 +64,7 @@ const Footer = () => {
                 { label: "Contact Us", path: "/contact" },
               ].map((item) => (
                 <li key={item.label}>
-                  <Link to={item.path} className="opacity-80 hover:opacity-100 hover:text-secondary transition-all">
+                  <Link href={item.path} className="opacity-80 hover:opacity-100 hover:text-secondary transition-all">
                     {item.label}
                   </Link>
                 </li>
@@ -95,8 +97,8 @@ const Footer = () => {
             © {new Date().getFullYear()} Government Graduate College, Shahdara, Lahore. All rights reserved.
           </p>
           <div className="flex gap-4 text-sm opacity-60">
-            <Link to="/privacy-policy" className="hover:opacity-100 transition-opacity">Privacy Policy</Link>
-            <Link to="/terms-of-use" className="hover:opacity-100 transition-opacity">Terms of Use</Link>
+            <Link href="/privacy-policy" className="hover:opacity-100 transition-opacity">Privacy Policy</Link>
+            <Link href="/terms-of-use" className="hover:opacity-100 transition-opacity">Terms of Use</Link>
             <a href="#" className="hover:opacity-100 transition-opacity">Sitemap</a>
           </div>
         </div>

@@ -1,6 +1,10 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Header from "./Header";
 import Footer from "./Footer";
-import LiveChatWidget from "@/components/LiveChatWidget";
+
+const LiveChatWidget = dynamic(() => import("@/components/LiveChatWidget"), { ssr: false });
 
 interface PublicLayoutProps {
   children: React.ReactNode;

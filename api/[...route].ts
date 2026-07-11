@@ -8,7 +8,8 @@ import Department from '../models/Departments';
 import Faculty from '../models/Faculty';
 import Gallery from '../models/Gallery';
 import Message from '../models/Messages';
-import { ChatMessage } from '../backend/models/ChatMessage';
+import ChatMessage from '../models/ChatMessage';
+import ChatConversation from '../models/ChatConversation';
 
 function getRoute(req: VercelRequest): string {
   const route = req.query.route;
@@ -221,6 +222,124 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timestamp: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
       tempId: tempId || null,
     });
+    return;
+  }
+
+  // GET messages for a conversation (path: /chat/messages/:conversationId)
+  if (route.startsWith('chat/messages/') && method === 'GET') {
+    const parts = route.split('/');
+    const conversationId = parts[2] || '';
+    if (!conversationId) {
+      sendJson(res, 400, { error: 'conversationId is required' });
+      return;
+    }
+
+    const db = await tryConnect();
+    if (db) {
+      const items = await ChatMessage.find({ conversation_id: conversationId }).sort({ created_at: 1 }).lean();
+      sendJson(res, 200, items);
+      return;
+    }
+
+    sendJson(res, 200, []);
+    return;
+  }
+
+  // POST create/get conversation (path: /chat/conversation)
+  if (route === 'chat/conversation' && method === 'POST') {
+    const { visitor_name, visitor_session_id } = req.body || {};
+    if (!visitor_name) {
+      sendJson(res, 400, { error: 'visitor_name is required' });
+      return;
+    }
+
+    try {
+      const db = await tryConnect();
+      if (db) {
+        let conversation = null;
+        if (visitor_session_id) {
+          conversation = await ChatConversation.findOne({ visitor_session_id, status: 'active' }).lean();
+        }
+
+        if (!conversation) {
+          const created = await ChatConversation.create({ visitor_name, visitor_session_id, status: 'active' });
+          sendJson(res, 200, created);
+          return;
+        }
+
+        sendJson(res, 200, conversation);
+        return;
+      }
+
+      sendJson(res, 200, { visitor_name, visitor_session_id, status: 'active' });
+      return;
+    } catch (error) {
+      console.error('chat/conversation error:', error);
+      sendJson(res, 500, { error: 'Failed to create/get conversation' });
+      return;
+    }
+  }
+
+  // GET conversations (admin) - /chat/conversations
+  if (route === 'chat/conversations' && method === 'GET') {
+    const token = extractTokenFromHeader(req.headers.authorization as string | undefined);
+    if (!token || !verifyToken(token)) {
+      sendJson(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const db = await tryConnect();
+    if (db) {
+      const { status } = req.query;
+      const filter: any = {};
+      if (status && typeof status === 'string') filter.status = status;
+      const items = await ChatConversation.find(filter).sort({ updated_at: -1 }).lean();
+      sendJson(res, 200, items);
+      return;
+    }
+
+    sendJson(res, 200, []);
+    return;
+  }
+
+  // GET unread count and stats endpoints (admin)
+  if (route === 'chat/unread-count' && method === 'GET') {
+    const token = extractTokenFromHeader(req.headers.authorization as string | undefined);
+    if (!token || !verifyToken(token)) {
+      sendJson(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const db = await tryConnect();
+    if (db) {
+      const count = await ChatMessage.countDocuments({ read_at: null, sender_type: 'visitor' });
+      sendJson(res, 200, { count });
+      return;
+    }
+
+    sendJson(res, 200, { count: 0 });
+    return;
+  }
+
+  if (route === 'chat/stats' && method === 'GET') {
+    const token = extractTokenFromHeader(req.headers.authorization as string | undefined);
+    if (!token || !verifyToken(token)) {
+      sendJson(res, 401, { error: 'Unauthorized' });
+      return;
+    }
+
+    const db = await tryConnect();
+    if (db) {
+      const totalConversations = await ChatConversation.countDocuments();
+      const activeConversations = await ChatConversation.countDocuments({ status: 'active' });
+      const totalMessages = await ChatMessage.countDocuments();
+      const unreadMessages = await ChatMessage.countDocuments({ read_at: null });
+
+      sendJson(res, 200, { totalConversations, activeConversations, totalMessages, unreadMessages });
+      return;
+    }
+
+    sendJson(res, 200, { totalConversations: 0, activeConversations: 0, totalMessages: 0, unreadMessages: 0 });
     return;
   }
 
