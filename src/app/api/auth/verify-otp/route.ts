@@ -5,6 +5,8 @@ import { verifyAdminOtp } from '@/lib/otp'
 import { jsonOk, jsonError, handleRouteError } from '@/lib/route-utils'
 import { sanitizeText } from '@/lib/sanitize'
 
+export const dynamic = 'force-dynamic'
+
 const otpAttempts = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(ip: string): boolean {

@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { dispatchApi } from '@/lib/api-router'
 
+export const dynamic = 'force-dynamic'
+
 type Params = { params: Promise<{ path?: string[] }> }
 
 async function handle(req: NextRequest, { params }: Params) {

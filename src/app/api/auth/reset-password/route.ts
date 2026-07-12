@@ -5,6 +5,8 @@ import { verifyAdminOtp } from '@/lib/otp'
 import { jsonOk, jsonError, handleRouteError } from '@/lib/route-utils'
 import { sanitizeText } from '@/lib/sanitize'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Complete password reset after OTP verification.
  * Body: { email, otp, password }

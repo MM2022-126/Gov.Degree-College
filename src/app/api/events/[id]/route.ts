@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { runHandler } from '@/lib/handlers/wrap'
 import * as events from '@/lib/handlers/events'
 
+export const dynamic = 'force-dynamic'
+
 type Params = { params: Promise<{ id: string }> }
 
 export async function GET(_req: NextRequest, { params }: Params) {
