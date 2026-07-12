@@ -1,4 +1,4 @@
-# Legacy unused handler only — do NOT ignore src/app/api (App Router routes)
+# Legacy unused handler only - do NOT ignore src/app/api (App Router routes)
 src/api/
 backend/
 backend/**
