@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { connectDB } from '@/lib/mongodb'
 import { issueAdminOtp } from '@/lib/otp'
+import { isValidAdminEmail } from '@/lib/auth'
 import { jsonOk, jsonError, handleRouteError } from '@/lib/route-utils'
 import { sanitizeText, isValidEmail } from '@/lib/sanitize'
 
@@ -44,11 +45,12 @@ export async function POST(req: NextRequest) {
       message: 'If that email is registered, a verification code has been sent.',
     }
 
-    if (email !== process.env.ADMIN_EMAIL) {
+    if (!isValidAdminEmail(email)) {
       return jsonOk(generic)
     }
 
-    const otpResult = await issueAdminOtp(email, 'password_change')
+    const adminEmail = process.env.ADMIN_EMAIL!.trim()
+    const otpResult = await issueAdminOtp(adminEmail, 'password_change')
 
     return jsonOk({
       ...generic,
