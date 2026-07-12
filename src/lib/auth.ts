@@ -74,7 +74,17 @@ export function clearAuthCookie(response: NextResponse) {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  // DB hash (set via forgot-password reset) takes precedence when present.
+  // Env password is source of truth when set on Vercel/.env (easy credential rotation).
+  if (process.env.ADMIN_PASSWORD) {
+    return password === process.env.ADMIN_PASSWORD
+  }
+
+  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
+  if (envHash && !envHash.includes('example.hash')) {
+    return bcrypt.compare(password, envHash)
+  }
+
+  // Fallback: hash from forgot-password reset (used when no env password is configured).
   try {
     const Settings = (await import('@/models/Settings')).default
     await connectDBForAuth()
@@ -83,16 +93,9 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
       return bcrypt.compare(password, hashSetting.value)
     }
   } catch {
-    // fall through to env-based auth
+    // ignore
   }
 
-  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
-  if (envHash && !envHash.includes('example.hash')) {
-    return bcrypt.compare(password, envHash)
-  }
-  if (process.env.ADMIN_PASSWORD) {
-    return password === process.env.ADMIN_PASSWORD
-  }
   return false
 }
 
@@ -113,5 +116,7 @@ async function connectDBForAuth() {
 }
 
 export function isValidAdminEmail(email: string): boolean {
-  return email === process.env.ADMIN_EMAIL
+  const configured = process.env.ADMIN_EMAIL?.trim()
+  if (!configured) return false
+  return email.trim().toLowerCase() === configured.toLowerCase()
 }
