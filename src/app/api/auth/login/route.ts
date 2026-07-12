@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { generateToken, setAuthCookie, isValidAdminEmail, verifyAdminPassword } from '@/lib/auth'
+import { NextRequest } from 'next/server'
+import { connectDB } from '@/lib/mongodb'
+import { isValidAdminEmail, verifyAdminPassword } from '@/lib/auth'
+import { issueAdminOtp } from '@/lib/otp'
 import { jsonOk, jsonError, handleRouteError } from '@/lib/route-utils'
 import { sanitizeText } from '@/lib/sanitize'
 
@@ -17,6 +19,10 @@ function checkRateLimit(ip: string): boolean {
   return true
 }
 
+/**
+ * Step 1 of login: validate email + password, then email a one-time code.
+ * JWT is issued only after POST /api/auth/verify-otp.
+ */
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
@@ -34,10 +40,13 @@ export async function POST(req: NextRequest) {
     const valid = await verifyAdminPassword(password)
     if (!valid) return jsonError('Invalid credentials', 401)
 
-    const token = generateToken(email)
-    const response = jsonOk({ success: true, message: 'Login successful' })
-    setAuthCookie(response, token)
-    return response
+    await connectDB()
+    const otpResult = await issueAdminOtp(email, 'login')
+
+    return jsonOk({
+      requiresOtp: true,
+      ...otpResult,
+    })
   } catch (error) {
     return handleRouteError(error)
   }

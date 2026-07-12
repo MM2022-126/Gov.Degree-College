@@ -256,16 +256,32 @@ async function main() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
   })
-  const setCookie = loginRes.headers.get('set-cookie') || ''
+  const loginBody = await loginRes.json().catch(() => ({}))
+  log('B', 'test-admin-api:login', 'login otp request', { status: loginRes.status, requiresOtp: !!loginBody.requiresOtp })
+  if (!loginRes.ok || !loginBody.requiresOtp) {
+    console.error('Login OTP request failed:', loginBody)
+    process.exit(1)
+  }
+  const otp = loginBody.devOtp
+  if (!otp) {
+    console.error('No devOtp returned. Configure SMTP or run in development without SMTP so the smoke test can read the code.')
+    process.exit(1)
+  }
+  const verifyRes = await fetch(`${BASE}/api/auth/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: EMAIL, otp }),
+  })
+  const setCookie = verifyRes.headers.get('set-cookie') || ''
   const tokenMatch = setCookie.match(/admin_token=([^;]+)/)
-  log('B', 'test-admin-api:login', 'login', { status: loginRes.status, hasCookie: !!tokenMatch })
+  log('B', 'test-admin-api:verify-otp', 'verify', { status: verifyRes.status, hasCookie: !!tokenMatch })
   if (!tokenMatch) {
-    const body = await loginRes.text()
-    console.error('Login failed:', body)
+    const body = await verifyRes.text()
+    console.error('OTP verify failed:', body)
     process.exit(1)
   }
   const cookie = `admin_token=${tokenMatch[1]}`
-  console.log('Login: OK\n')
+  console.log('Login (OTP): OK\n')
 
   const results = []
   for (const resource of RESOURCES) {

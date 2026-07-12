@@ -30,7 +30,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json()
 }
 
-export const loginAdmin = async (email: string, password: string) => {
+export const requestAdminLoginOtp = async (email: string, password: string) => {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,8 +39,31 @@ export const loginAdmin = async (email: string, password: string) => {
   })
   const data = await response.json().catch(() => ({ error: 'Login failed' }))
   if (!response.ok) throw new Error(data?.error || 'Invalid credentials')
+  return data as {
+    requiresOtp: boolean
+    message: string
+    emailSent: boolean
+    expiresInSeconds: number
+    devOtp?: string
+  }
+}
+
+export const verifyAdminLoginOtp = async (email: string, otp: string) => {
+  const response = await fetch(`${API_URL}/auth/verify-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+    credentials: 'include',
+  })
+  const data = await response.json().catch(() => ({ error: 'Verification failed' }))
+  if (!response.ok) throw new Error(data?.error || 'Invalid verification code')
   if (data.admin?.email) sessionStorage.setItem('admin_email', data.admin.email)
   return data
+}
+
+/** @deprecated Prefer requestAdminLoginOtp + verifyAdminLoginOtp (OTP login). */
+export const loginAdmin = async (email: string, password: string) => {
+  return requestAdminLoginOtp(email, password)
 }
 
 export const logout = async () => {

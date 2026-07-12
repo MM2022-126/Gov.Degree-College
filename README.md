@@ -20,11 +20,11 @@ There is **no separate Express backend**. All former `backend/` routes live unde
 
 - Public pages: Home, About, Departments, Faculty, Admissions, News, Events, Gallery, Schedule, Contact
 - Admin CMS: News, Events, Announcements, Departments, Faculty, Media, Schedule, Live Chat
-- Admin authentication with cookie-based JWT
-- **Forgot password** flow for admin (`/admin/forgot-password`)
+- Admin authentication with cookie-based JWT + **email OTP verification**
+- **Forgot password** with OTP sent to the admin email (`/admin/forgot-password`)
 - Live chat via **WebSockets on Vercel Functions** (with HTTP polling fallback)
 - SEO: metadata, sitemap, robots.txt, JSON-LD structured data
-- Security: CSP headers, input sanitization, NoSQL injection guards, rate-limited login
+- Security: CSP headers, input sanitization, NoSQL injection guards, rate-limited login/OTP
 
 ## Quick Start
 
@@ -47,15 +47,35 @@ Copy `.env.local.example` to `.env.local` and fill in values:
 ```env
 MONGODB_URI=mongodb+srv://...
 JWT_SECRET=your_secret_min_32_chars
-ADMIN_EMAIL=admin@ggc.edu.pk
+ADMIN_EMAIL=youradmin@gmail.com
 ADMIN_PASSWORD=your_password
-# Or use bcrypt hash (recommended):
-# ADMIN_PASSWORD_HASH=
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Gmail SMTP (App Password) — required to email OTPs in production
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=youradmin@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM="College Admin <youradmin@gmail.com>"
 ```
+
+Without SMTP in **development**, OTP codes are returned in the API response as `devOtp` so you can still log in locally.
+
+### Admin login (OTP)
+
+1. Enter admin email + password
+2. A 6-digit code is emailed to `ADMIN_EMAIL`
+3. Enter the code to complete sign-in
+
+### Forgot / change password (OTP)
+
+1. Open `/admin/forgot-password` and enter `ADMIN_EMAIL`
+2. Enter the emailed OTP + new password
+3. Sign in with the new password (MongoDB hash takes precedence after reset)
 
 ### Development
 
@@ -78,7 +98,20 @@ npm start
 
 1. Import this repository in [Vercel](https://vercel.com)
 2. Framework preset: **Next.js** (auto-detected)
-3. Add all environment variables from `.env.local.example`
+3. Add these environment variables (from `.env.local.example`):
+
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `MONGODB_URI` | Yes | Atlas connection string; allow Vercel IPs (or `0.0.0.0/0`) in Atlas Network Access |
+| `JWT_SECRET` | Yes | Random ≥32 characters |
+| `ADMIN_EMAIL` | Yes | Admin Gmail / inbox that receives OTPs |
+| `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` | Yes | Initial password (hash preferred) |
+| `NEXT_PUBLIC_SITE_URL` | Yes | Production URL, e.g. `https://your-app.vercel.app` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Yes (for OTPs) | Gmail: host `smtp.gmail.com`, port `587`, App Password |
+| `CLOUDINARY_*` | For media uploads | Cloud name, API key, secret |
+| `REDIS_URL` | Recommended | Upstash for multi-instance live chat |
+| `JWT_EXPIRY` | Optional | Default `8h` |
+
 4. **Enable real-time chat (recommended):** add [Upstash Redis](https://vercel.com/marketplace/upstash) from the Vercel Marketplace so WebSocket events sync across all serverless instances:
    ```bash
    vercel link
@@ -125,11 +158,12 @@ All endpoints are relative to `/api`:
 
 | Public | Admin (cookie auth) |
 |--------|---------------------|
-| `GET /api/health` | `POST /api/auth/login` |
-| `GET /api/news`, `/events`, `/departments` | CRUD on news, events, faculty, media, … |
-| `POST /api/contact` | `GET /api/admin/dashboard-stats` |
-| `GET/POST /api/chat-messages` | `GET /api/ws` (WebSocket live chat) |
-| `GET /api/settings` | `POST /api/upload`, `POST /api/auth/forgot-password` |
+| `GET /api/health` | `POST /api/auth/login` (sends OTP) |
+| `GET /api/news`, `/events`, `/departments` | `POST /api/auth/verify-otp` (sets session) |
+| `POST /api/contact` | CRUD on news, events, faculty, media, … |
+| `GET/POST /api/chat-messages` | `GET /api/admin/dashboard-stats` |
+| `GET /api/settings` | `GET /api/ws` (WebSocket live chat) |
+| | `POST /api/upload`, `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` |
 
 ## License
 
