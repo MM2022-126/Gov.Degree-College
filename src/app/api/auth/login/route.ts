@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
     if (!valid) return jsonError('Invalid credentials', 401)
 
     await connectDB()
-    const otpResult = await issueAdminOtp(email, 'login')
+    const adminEmail = process.env.ADMIN_EMAIL!.trim()
+    const otpResult = await issueAdminOtp(adminEmail, 'login')
 
     return jsonOk({
       requiresOtp: true,

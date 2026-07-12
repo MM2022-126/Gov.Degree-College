@@ -27,14 +27,16 @@ export async function POST(req: NextRequest) {
       return jsonError('Invalid or expired verification code', 400)
     }
 
-    const result = await verifyAdminOtp(email, 'password_change', otp)
+    const adminEmail = process.env.ADMIN_EMAIL!.trim()
+    const result = await verifyAdminOtp(adminEmail, 'password_change', otp)
     if (!result.ok) return jsonError(result.error, result.status)
 
     await updateAdminPasswordHash(password)
 
     return jsonOk({
       success: true,
-      message: 'Password updated successfully. You can now log in.',
+      message:
+        'Password updated successfully. Sign in with your new password (the previous env password no longer works).',
     })
   } catch (error) {
     return handleRouteError(error)

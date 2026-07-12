@@ -67,15 +67,22 @@ Without SMTP in **development**, OTP codes are returned in the API response as `
 
 ### Admin login (OTP)
 
-1. Enter admin email + password
-2. A 6-digit code is emailed to `ADMIN_EMAIL`
+1. Enter `ADMIN_EMAIL` + password
+2. A 6-digit code is emailed to that address
 3. Enter the code to complete sign-in
+
+**Password source of truth**
+
+| Situation | Password that works |
+|-----------|---------------------|
+| First deploy (no reset yet) | `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`) from env |
+| After forgot-password reset | **New password only** (stored hashed in MongoDB). Env password is ignored until you delete that DB hash. |
 
 ### Forgot / change password (OTP)
 
 1. Open `/admin/forgot-password` and enter `ADMIN_EMAIL`
-2. Enter the emailed OTP + new password
-3. Sign in with the new password (MongoDB hash takes precedence after reset)
+2. Enter the emailed OTP + choose a new password (min 8 characters)
+3. Sign in with the **new** password + OTP — not the old env password
 
 ### Development
 
@@ -105,7 +112,7 @@ npm start
 | `MONGODB_URI` | Yes | Atlas connection string; allow Vercel IPs (or `0.0.0.0/0`) in Atlas Network Access |
 | `JWT_SECRET` | Yes | Random ≥32 characters |
 | `ADMIN_EMAIL` | Yes | Admin Gmail / inbox that receives OTPs |
-| `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` | Yes | Initial password (hash preferred) |
+| `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` | Yes (bootstrap) | Initial password until someone uses forgot-password; after a reset, MongoDB hash wins |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Production URL, e.g. `https://your-app.vercel.app` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Yes (for OTPs) | Gmail: host `smtp.gmail.com`, port `587`, App Password |
 | `CLOUDINARY_*` | For media uploads | Cloud name, API key, secret |

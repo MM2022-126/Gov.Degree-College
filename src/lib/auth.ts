@@ -74,17 +74,7 @@ export function clearAuthCookie(response: NextResponse) {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  // Env password is source of truth when set on Vercel/.env (easy credential rotation).
-  if (process.env.ADMIN_PASSWORD) {
-    return password === process.env.ADMIN_PASSWORD
-  }
-
-  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
-  if (envHash && !envHash.includes('example.hash')) {
-    return bcrypt.compare(password, envHash)
-  }
-
-  // Fallback: hash from forgot-password reset (used when no env password is configured).
+  // 1) MongoDB hash wins when present (set by forgot-password / reset).
   try {
     const Settings = (await import('@/models/Settings')).default
     await connectDBForAuth()
@@ -93,7 +83,16 @@ export async function verifyAdminPassword(password: string): Promise<boolean> {
       return bcrypt.compare(password, hashSetting.value)
     }
   } catch {
-    // ignore
+    // fall through to env bootstrap credentials
+  }
+
+  // 2) Bootstrap from env when no DB hash exists yet (first deploy).
+  const envHash = process.env.ADMIN_PASSWORD_HASH?.trim()
+  if (envHash && !envHash.includes('example.hash')) {
+    return bcrypt.compare(password, envHash)
+  }
+  if (process.env.ADMIN_PASSWORD) {
+    return password === process.env.ADMIN_PASSWORD
   }
 
   return false
