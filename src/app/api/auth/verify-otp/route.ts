@@ -39,14 +39,15 @@ export async function POST(req: NextRequest) {
     if (!email || !otp) return jsonError('Email and verification code are required', 400)
     if (!isValidAdminEmail(email)) return jsonError('Invalid credentials', 401)
 
-    const result = await verifyAdminOtp(email, 'login', otp)
+    const adminEmail = process.env.ADMIN_EMAIL!.trim()
+    const result = await verifyAdminOtp(adminEmail, 'login', otp)
     if (!result.ok) return jsonError(result.error, result.status)
 
-    const token = generateToken(email)
+    const token = generateToken(adminEmail)
     const response = jsonOk({
       success: true,
       message: 'Login successful',
-      admin: { email },
+      admin: { email: adminEmail },
     })
     setAuthCookie(response, token)
     return response
