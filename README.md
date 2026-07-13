@@ -52,6 +52,7 @@ ADMIN_PASSWORD=your_password
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
+# Optional alternative: CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # Gmail SMTP (App Password) — required to email OTPs in production
@@ -115,7 +116,7 @@ npm start
 | `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` | Yes (bootstrap) | Initial password until someone uses forgot-password; after a reset, MongoDB hash wins |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Production URL, e.g. `https://your-app.vercel.app` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Yes (for OTPs) | Gmail: host `smtp.gmail.com`, port `587`, App Password |
-| `CLOUDINARY_*` | For media uploads | Cloud name, API key, secret |
+| `CLOUDINARY_*` | For media uploads | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` — or single `CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>` |
 | `REDIS_URL` | Recommended | Upstash for multi-instance live chat |
 | `JWT_EXPIRY` | Optional | Default `8h` |
 
