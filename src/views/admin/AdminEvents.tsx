@@ -168,15 +168,8 @@ const AdminEvents = () => {
   };
 
   const uploadToCloudinary = async (file: File): Promise<{ url: string; publicId: string }> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch(`${getApiBaseUrl()}/upload`, {
-      method: 'POST',
-      credentials: 'include',
-      body: formData
-    });
-    if (!res.ok) throw new Error('Upload failed');
-    return await res.json();
+    const { uploadToCloudinary: upload } = await import('@/lib/cloudinary-client');
+    return upload(file);
   };
 
   const handleSave = async () => {

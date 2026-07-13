@@ -89,18 +89,8 @@ interface Event {
 }
 
 const uploadToCloudinary = async (file: File): Promise<{ url: string; publicId: string }> => {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch(`${API_URL}/upload`, {
-    method: "POST",
-    body: formData,
-    credentials: "include"
-  });
-
-  if (!response.ok) throw new Error("Upload failed");
-  const data = await response.json();
-  return { url: data.url, publicId: data.publicId };
+  const { uploadToCloudinary: upload } = await import("@/lib/cloudinary-client");
+  return upload(file);
 };
 
 const AdminEventsNew = () => {

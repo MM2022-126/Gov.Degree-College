@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Image, Trash2, Edit2, Loader } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { uploadToCloudinary } from "@/lib/cloudinary-client";
 
 interface MediaItem {
   _id: string;
@@ -83,20 +84,24 @@ const AdminMedia = () => {
   }, [fetchMedia]);
 
   const handleFileSelect = (selectedFile: File) => {
-    if (!selectedFile.type.startsWith('image/')) {
-      toast({ title: 'Error', description: 'Only image files allowed', variant: 'destructive' });
+    if (!selectedFile.type.startsWith('image/') && !selectedFile.type.startsWith('video/')) {
+      toast({ title: 'Error', description: 'Only image or video files allowed', variant: 'destructive' });
       return;
     }
     
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      toast({ title: 'Error', description: 'File size must be less than 10MB', variant: 'destructive' });
+    if (selectedFile.size > 100 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'File size must be less than 100MB', variant: 'destructive' });
       return;
     }
 
     setFile(selectedFile);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreview(e.target?.result as string);
-    reader.readAsDataURL(selectedFile);
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target?.result as string);
+      reader.readAsDataURL(selectedFile);
+    } else {
+      setPreview('');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -113,20 +118,9 @@ const AdminMedia = () => {
 
     setUploading(true);
     try {
-      // Step 1: Upload to Cloudinary
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const uploadRes = await fetch(`/api/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-      
-      if (!uploadRes.ok) throw new Error('Cloudinary upload failed');
-      const { url, publicId } = await uploadRes.json();
+      const { url, publicId } = await uploadToCloudinary(file);
 
-      // Step 2: Save metadata to MongoDB
+      // Save metadata to MongoDB
       const mediaRes = await fetch(`/api/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,9 +135,12 @@ const AdminMedia = () => {
         })
       });
 
-      if (!mediaRes.ok) throw new Error('Failed to save media record');
+      if (!mediaRes.ok) {
+        const body = await mediaRes.json().catch(() => ({}));
+        throw new Error(body?.error || 'Failed to save media record');
+      }
 
-      toast({ title: 'Success', description: 'Image uploaded successfully' });
+      toast({ title: 'Success', description: 'Media uploaded successfully' });
       
       // Reset form
       setFile(null);
@@ -158,7 +155,11 @@ const AdminMedia = () => {
       fetchMedia();
     } catch (err) {
       console.error('Upload error:', err);
-      toast({ title: 'Error', description: 'Upload failed. Please try again.', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Upload failed. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
     }
@@ -227,7 +228,7 @@ const AdminMedia = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 className="hidden"
               />

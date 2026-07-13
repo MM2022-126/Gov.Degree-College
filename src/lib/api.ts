@@ -151,14 +151,8 @@ export const updatePage = (slug: string, data: unknown) => apiCall(`/pages/${slu
 export const deletePage = (slug: string) => apiCall(`/pages/${slug}`, { method: 'DELETE' })
 
 export const uploadImage = async (file: File): Promise<{ url: string; publicId: string }> => {
-  const formData = new FormData()
-  formData.append('file', file)
-  const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData, credentials: 'include' })
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Upload failed' }))
-    throw new Error(error?.error || 'Upload failed')
-  }
-  return response.json()
+  const { uploadToCloudinary } = await import('@/lib/cloudinary-client')
+  return uploadToCloudinary(file)
 }
 
 export const getOrCreateChatConversation = (visitorName: string) =>

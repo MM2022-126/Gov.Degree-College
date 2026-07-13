@@ -5,7 +5,7 @@ import { requireAuth, verifyTokenString, getTokenFromRequest, AuthError } from '
 import { generateSlug, findByIdOrSlug } from '@/lib/slug'
 import { sanitizeObject, sanitizeText, sanitizeHtml, isValidEmail } from '@/lib/sanitize'
 import { DEFAULT_SETTINGS } from '@/lib/route-utils'
-import { uploadImageBuffer, deleteCloudinaryImage } from '@/lib/cloudinary'
+import { uploadMediaBuffer, deleteCloudinaryImage, createCloudinaryUploadSignature } from '@/lib/cloudinary'
 import Announcements from '@/models/Announcements'
 import Departments from '@/models/Departments'
 import Faculty from '@/models/Faculty'
@@ -604,17 +604,46 @@ export async function dispatchApi(req: NextRequest, pathSegments: string[]): Pro
       return json({ message: 'Media deleted successfully' })
     }
 
-    // UPLOAD
+    // UPLOAD — signature for direct browser → Cloudinary (recommended on Vercel)
+    if (path === 'upload/sign' && (method === 'GET' || method === 'POST')) {
+      await requireAuth(req)
+      try {
+        return json(createCloudinaryUploadSignature('ggc-college'))
+      } catch (e) {
+        return err(e instanceof Error ? e.message : 'Cloudinary not configured', 500)
+      }
+    }
+
+    // UPLOAD — server proxy (small files only; Vercel body limit ~4.5MB)
     if (path === 'upload' && method === 'POST') {
       await requireAuth(req)
-      const form = await req.formData()
-      const file = form.get('file') as File | null
-      if (!file) return err('No file provided', 400)
-      if (!file.type.startsWith('image/')) return err('Only image files allowed', 400)
-      if (file.size > 10 * 1024 * 1024) return err('File too large (max 10MB)', 400)
-      const buffer = Buffer.from(await file.arrayBuffer())
-      const result = await uploadImageBuffer(buffer)
-      return json(result)
+      try {
+        if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+          return err(
+            'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in Vercel env.',
+            500,
+          )
+        }
+        const form = await req.formData()
+        const file = form.get('file') as File | null
+        if (!file) return err('No file provided', 400)
+        const isImage = file.type.startsWith('image/')
+        const isVideo = file.type.startsWith('video/')
+        if (!isImage && !isVideo) return err('Only image or video files are allowed', 400)
+        // Vercel serverless request body limit is ~4.5MB on Hobby
+        if (file.size > 4 * 1024 * 1024) {
+          return err(
+            'File too large for server upload (max 4MB on Vercel). The app should use direct Cloudinary upload for larger files.',
+            400,
+          )
+        }
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const result = await uploadMediaBuffer(buffer, { mimeType: file.type })
+        return json(result)
+      } catch (e) {
+        console.error('Upload error:', e)
+        return err(e instanceof Error ? e.message : 'Cloudinary upload failed', 500)
+      }
     }
 
     // ADMIN DASHBOARD
