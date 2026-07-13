@@ -593,6 +593,9 @@ export async function dispatchApi(req: NextRequest, pathSegments: string[]): Pro
       await requireAuth(req)
       const b = await body(req)
       if (!b.url || !b.publicId || !b.category) return err('url, publicId, and category are required', 400)
+      if (!b.resourceType) {
+        b.resourceType = /\/video\/upload\//i.test(String(b.url)) ? 'video' : 'image'
+      }
       return json(await Media.create(b), 201)
     }
     if (path.startsWith('media/') && method === 'PUT') {
@@ -689,10 +692,34 @@ export async function dispatchApi(req: NextRequest, pathSegments: string[]): Pro
 
       const [recentEvents, recentNews, recentMedia, recentMsgs] = recentActivity
       const activityItems = [
-        ...(recentEvents as any[]).map((e) => ({ type: 'event', label: 'New event created', title: e.title, time: e.created_at })),
-        ...(recentNews as any[]).map((n) => ({ type: 'news', label: 'News article published', title: n.title, time: n.created_at })),
-        ...(recentMedia as any[]).map((m) => ({ type: 'media', label: `Media uploaded (${m.category})`, title: m.altText || 'New image', time: m.uploadedAt })),
-        ...(recentMsgs as any[]).map((m) => ({ type: 'message', label: 'New message received', title: `From ${m.senderDisplayName}: ${m.text.substring(0, 40)}...`, time: m.createdAt })),
+        ...(recentEvents as any[]).map((e) => ({
+          type: 'event',
+          label: 'New event created',
+          title: e.title,
+          time: e.created_at,
+          href: '/admin/events',
+        })),
+        ...(recentNews as any[]).map((n) => ({
+          type: 'news',
+          label: 'News article published',
+          title: n.title,
+          time: n.created_at,
+          href: '/admin/news',
+        })),
+        ...(recentMedia as any[]).map((m) => ({
+          type: 'media',
+          label: `Media uploaded (${m.category})`,
+          title: m.altText || 'New image',
+          time: m.uploadedAt,
+          href: '/admin/media',
+        })),
+        ...(recentMsgs as any[]).map((m) => ({
+          type: 'message',
+          label: 'New message received',
+          title: `From ${m.senderDisplayName}: ${(m.text || '').substring(0, 40)}${(m.text || '').length > 40 ? '...' : ''}`,
+          time: m.createdAt,
+          href: '/admin/chat',
+        })),
       ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 8)
 
       return json({

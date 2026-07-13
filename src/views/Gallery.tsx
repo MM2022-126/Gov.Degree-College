@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import PublicLayout from "@/components/layout/PublicLayout";
 import PageSEO from "@/components/PageSEO";
+import { isVideoMediaUrl, normalizeMediaListResponse } from "@/lib/media-url";
 
 interface MediaItem {
   _id: string;
@@ -10,6 +11,7 @@ interface MediaItem {
   altText?: string;
   caption?: string;
   category: string;
+  resourceType?: string;
 }
 
 const Gallery = () => {
@@ -43,9 +45,7 @@ const Gallery = () => {
         return r.json();
       })
       .then(data => {
-        // Handle both { media: [...] } and [...] response shapes
-        const items = Array.isArray(data) ? data : (data.media ?? []);
-        // DEBUG: Gallery loaded
+        const items = normalizeMediaListResponse(data) as MediaItem[];
         setMedia(items);
         setLoading(false);
       })
@@ -102,7 +102,7 @@ const Gallery = () => {
 
           {/* Count */}
           <p className="text-gray-400 text-sm mb-4">
-            {media.length} photo{media.length !== 1 ? "s" : ""}
+            {media.length} item{media.length !== 1 ? "s" : ""}
           </p>
 
           {/* Empty State */}
@@ -116,24 +116,35 @@ const Gallery = () => {
           {/* Masonry Grid */}
           {media.length > 0 && (
             <div className="columns-2 md:columns-3 lg:columns-4 gap-3">
-              {media.map((item, index) => (
+              {media.map((item, index) => {
+                const isVideo = isVideoMediaUrl(item.url, item.resourceType);
+                return (
                 <div
                   key={item._id}
                   className="break-inside-avoid mb-3 cursor-pointer 
                              overflow-hidden rounded-xl group relative"
                   onClick={() => setLightboxIndex(index)}
                 >
-                  <img
-                    src={item.url}
-                    alt={item.altText || "GGC college photo"}
-                    className="w-full object-cover group-hover:scale-105 
-                               transition-transform duration-300"
-                    loading="lazy"
-                    onError={(e) => {
-                      // Hide broken images
-                      e.currentTarget.parentElement!.style.display = "none";
-                    }}
-                  />
+                  {isVideo ? (
+                    <video
+                      src={item.url}
+                      className="w-full object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={item.url}
+                      alt={item.altText || "GGC college photo"}
+                      className="w-full object-cover group-hover:scale-105 
+                                 transition-transform duration-300"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.parentElement!.style.display = "none";
+                      }}
+                    />
+                  )}
                   {/* Hover overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 
                                   transition-colors duration-200 rounded-xl" />
@@ -145,7 +156,8 @@ const Gallery = () => {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>
@@ -169,11 +181,21 @@ const Gallery = () => {
 
           <div className="flex-1 flex items-center justify-center px-16"
                onClick={e => e.stopPropagation()}>
-            <img
-              src={media[lightboxIndex].url}
-              alt={media[lightboxIndex].altText || "Gallery photo"}
-              className="max-h-full max-w-full object-contain rounded-xl"
-            />
+            {isVideoMediaUrl(media[lightboxIndex].url, media[lightboxIndex].resourceType) ? (
+              <video
+                src={media[lightboxIndex].url}
+                className="max-h-full max-w-full object-contain rounded-xl"
+                controls
+                autoPlay
+                playsInline
+              />
+            ) : (
+              <img
+                src={media[lightboxIndex].url}
+                alt={media[lightboxIndex].altText || "Gallery photo"}
+                className="max-h-full max-w-full object-contain rounded-xl"
+              />
+            )}
           </div>
 
           {(media[lightboxIndex].caption || media[lightboxIndex].altText) && (

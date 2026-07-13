@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const MediaSchema = new mongoose.Schema({
   url: { type: String, required: true },        // Cloudinary secure_url
   publicId: { type: String, required: true },   // Cloudinary public_id
+  resourceType: { type: String, enum: ['image', 'video', 'raw', 'auto'], default: 'image' },
   altText: { type: String, default: '' },       // Alt text for accessibility & SEO
   caption: { type: String, default: '' },       // Optional caption shown below image
   category: { 

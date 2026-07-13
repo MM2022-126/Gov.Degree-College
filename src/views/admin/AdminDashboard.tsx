@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Calendar, AlertCircle, MessageSquare, Image, Building2, Users, Newspaper, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,15 @@ interface ActivityItem {
   label: string;
   title: string;
   time: string;
+  href?: string;
 }
+
+const ACTIVITY_HREF: Record<ActivityItem["type"], string> = {
+  event: "/admin/events",
+  news: "/admin/news",
+  media: "/admin/media",
+  message: "/admin/chat",
+};
 
 interface DashboardData {
   stats: DashboardStats;
@@ -226,23 +235,31 @@ const AdminDashboard = () => {
             {recentActivity.length === 0 ? (
               <p className="text-muted-foreground text-sm">No recent activity</p>
             ) : (
-              <div className="space-y-4">
-                {recentActivity.map((item, idx) => (
-                  <div key={idx} className="flex items-start gap-4 pb-4 last:pb-0 border-b last:border-b-0">
-                    <div className="mt-1">
-                      {item.type === "event" && <Calendar className="h-5 w-5 text-blue-600" />}
-                      {item.type === "news" && <Newspaper className="h-5 w-5 text-green-600" />}
-                      {item.type === "media" && <Image className="h-5 w-5 text-purple-600" />}
-                      {item.type === "message" && <MessageSquare className="h-5 w-5 text-orange-600" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{item.label}</p>
-                      <p className="text-sm text-muted-foreground truncate">{item.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{formatTime(item.time)}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">{formatTime(item.time)}</span>
-                  </div>
-                ))}
+              <div className="space-y-1">
+                {recentActivity.map((item, idx) => {
+                  const href = item.href || ACTIVITY_HREF[item.type] || "/admin";
+                  return (
+                    <Link
+                      key={idx}
+                      href={href}
+                      className="flex items-start gap-4 rounded-lg p-3 -mx-1 border-b last:border-b-0 border-border/60 last:border-0 hover:bg-muted/60 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <div className="mt-1 shrink-0">
+                        {item.type === "event" && <Calendar className="h-5 w-5 text-blue-600" />}
+                        {item.type === "news" && <Newspaper className="h-5 w-5 text-green-600" />}
+                        {item.type === "media" && <Image className="h-5 w-5 text-purple-600" />}
+                        {item.type === "message" && <MessageSquare className="h-5 w-5 text-orange-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{item.label}</p>
+                        <p className="text-sm text-muted-foreground truncate">{item.title}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {formatTime(item.time)}
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </CardContent>

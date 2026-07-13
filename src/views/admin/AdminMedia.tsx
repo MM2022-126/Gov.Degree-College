@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Upload, Image, Trash2, Edit2, Loader } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { uploadToCloudinary } from "@/lib/cloudinary-client";
+import { isVideoMediaUrl, normalizeMediaListResponse } from "@/lib/media-url";
 
 interface MediaItem {
   _id: string;
   url: string;
   publicId: string;
+  resourceType?: string;
   altText: string;
   caption: string;
   category: string;
@@ -61,15 +63,14 @@ const AdminMedia = () => {
       });
       if (!res.ok) throw new Error('Failed to fetch media');
       const data = await res.json();
-      setMediaList(Array.isArray(data) ? data : []);
+      const items = normalizeMediaListResponse(data) as MediaItem[];
+      setMediaList(items);
       
       // Filter by selected category
       if (selectedCategory === 'all') {
-        setFilteredMedia(Array.isArray(data) ? data : []);
+        setFilteredMedia(items);
       } else {
-        setFilteredMedia(
-          (Array.isArray(data) ? data : []).filter((m: MediaItem) => m.category === selectedCategory)
-        );
+        setFilteredMedia(items.filter((m) => m.category === selectedCategory));
       }
     } catch (err) {
       console.error('Error fetching media:', err);
@@ -118,9 +119,9 @@ const AdminMedia = () => {
 
     setUploading(true);
     try {
-      const { url, publicId } = await uploadToCloudinary(file);
+      const { url, publicId, resourceType } = await uploadToCloudinary(file);
 
-      // Save metadata to MongoDB
+      // Save metadata to MongoDB (url is Cloudinary secure_url)
       const mediaRes = await fetch(`/api/media`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,6 +129,7 @@ const AdminMedia = () => {
         body: JSON.stringify({
           url,
           publicId,
+          resourceType: resourceType || (file.type.startsWith('video/') ? 'video' : 'image'),
           altText: altText.trim(),
           caption: caption.trim(),
           category,
@@ -356,20 +358,41 @@ const AdminMedia = () => {
   );
 };
 
-const MediaCard = ({ item, onDelete }: { item: MediaItem; onDelete: (id: string, publicId: string) => void }) => (
+const MediaCard = ({ item, onDelete }: { item: MediaItem; onDelete: (id: string, publicId: string) => void }) => {
+  const isVideo = isVideoMediaUrl(item.url, item.resourceType);
+
+  return (
   <div className="relative group rounded-xl overflow-hidden border bg-white hover:shadow-lg transition-shadow">
-    <div className="aspect-square overflow-hidden">
-      <img
-        src={item.url}
-        alt={item.altText}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-        loading="lazy"
-      />
+    <div className="aspect-square overflow-hidden bg-muted">
+      {isVideo ? (
+        <video
+          src={item.url}
+          className="w-full h-full object-cover"
+          muted
+          playsInline
+          preload="metadata"
+          controls
+        />
+      ) : (
+        <img
+          src={item.url}
+          alt={item.altText}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+          loading="lazy"
+        />
+      )}
     </div>
     <div className="p-2">
-      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-        {item.category}
-      </span>
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+          {item.category}
+        </span>
+        {isVideo && (
+          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+            video
+          </span>
+        )}
+      </div>
       {item.caption && (
         <p className="text-xs text-gray-500 mt-1 truncate">{item.caption}</p>
       )}
@@ -386,7 +409,8 @@ const MediaCard = ({ item, onDelete }: { item: MediaItem; onDelete: (id: string,
       </button>
     </div>
   </div>
-);
+  );
+};
 
 export default AdminMedia;
 
