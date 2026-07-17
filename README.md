@@ -47,8 +47,8 @@ Copy `.env.local.example` to `.env.local` and fill in values:
 ```env
 MONGODB_URI=mongodb+srv://...
 JWT_SECRET=your_secret_min_32_chars
-ADMIN_EMAIL=youradmin@gmail.com
-ADMIN_PASSWORD=your_password
+ADMIN_EMAIL=abc@gmail.com
+ADMIN_PASSWORD=abc
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
@@ -59,9 +59,9 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=youradmin@gmail.com
+SMTP_USER=xyz@gmail.com
 SMTP_PASS=your_gmail_app_password
-SMTP_FROM="College Admin <youradmin@gmail.com>"
+SMTP_FROM="College Admin <xyz@gmail.com>"
 ```
 
 Without SMTP in **development**, OTP codes are returned in the API response as `devOtp` so you can still log in locally.
